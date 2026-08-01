@@ -1,5 +1,31 @@
 import '../models/finance_models.dart';
 
+class CategorySpending {
+  final ExpenseCategory category;
+  final int spentCents;
+  final int? budgetLimitCents;
+
+  const CategorySpending({
+    required this.category,
+    required this.spentCents,
+    this.budgetLimitCents,
+  });
+
+  double get budgetUsage =>
+      budgetLimitCents == null || budgetLimitCents == 0
+          ? 0.0
+          : (spentCents / budgetLimitCents!).clamp(0.0, 2.0).toDouble();
+
+  bool get isOverBudget =>
+      budgetLimitCents != null && budgetLimitCents! > 0 && spentCents > budgetLimitCents!;
+
+  bool get isNearBudget =>
+      budgetLimitCents != null &&
+      budgetLimitCents! > 0 &&
+      spentCents > budgetLimitCents! * 0.8 &&
+      spentCents <= budgetLimitCents!;
+}
+
 class MonthProjection {
   final DateTime month;
   final int openingBalanceCents;
@@ -74,13 +100,12 @@ class ProjectionService {
     final projections = project(profile, until: normalizedMonth, scenario: scenario);
     final projection = projections.isEmpty ? null : projections.last;
     final plannedTripCosts = _tripCostsForMonth(profile, normalizedMonth);
-    final tripCostsBeforeMonth = _tripCostsUntil(profile, normalizedMonth);
-    final projectedClosing = (projection?.closingBalanceCents ?? profile.currentBalanceCents) - tripCostsBeforeMonth;
     final plannedEntries = _plannedEntriesForMonth(profile, normalizedMonth);
     final plannedPurchases = -_plannedPurchasesForMonth(profile, normalizedMonth);
     final income = _scenarioIncome(profile.monthlyIncomeCents, scenario);
     final fixed = _scenarioExpense(profile.monthlyFixedExpensesCents, scenario);
     final variable = _scenarioExpense(profile.monthlyVariableBudgetCents, scenario);
+    final projectedClosing = projection?.closingBalanceCents ?? profile.currentBalanceCents;
     final freeAfterPlans = projectedClosing -
         profile.safetyReserveCents -
         profile.reservedTripCents -
@@ -104,6 +129,8 @@ class ProjectionService {
     FinancialProfile profile, {
     required DateTime until,
     ForecastScenario scenario = ForecastScenario.realistic,
+    bool includeTripCosts = true,
+    bool includeConfirmedEntries = true,
   }) {
     final result = <MonthProjection>[];
     var balance = profile.currentBalanceCents;
@@ -118,11 +145,10 @@ class ProjectionService {
       final variable = _scenarioExpense(profile.monthlyVariableBudgetCents, scenario);
       final plannedEntries = _plannedEntriesForMonth(profile, month) +
           _plannedPurchasesForMonth(profile, month);
+      final confirmedEntries = includeConfirmedEntries ? _confirmedEntriesForMonth(profile, month) : 0;
+      final tripCosts = includeTripCosts ? _tripCostsForMonth(profile, month) : 0;
       final tripFunding = _monthlyTripFunding(profile, month);
-      // The trip funding is shown as an allocation, not subtracted twice from
-      // the cash balance. The trip cost is deducted once at its payment date
-      // in the forecast result.
-      balance += income - fixed - variable + plannedEntries;
+      balance += income - fixed - variable + plannedEntries + confirmedEntries - tripCosts;
       result.add(MonthProjection(
         month: month,
         openingBalanceCents: opening,
@@ -144,7 +170,7 @@ class ProjectionService {
     ForecastScenario scenario = ForecastScenario.realistic,
   }) {
     final months = _monthsUntil(trip.startsOn);
-    final projection = project(profile, until: trip.startsOn, scenario: scenario);
+    final projection = project(profile, until: trip.startsOn, scenario: scenario, includeTripCosts: false);
     final projected = projection.isEmpty
         ? profile.currentBalanceCents
         : projection.last.closingBalanceCents;
@@ -185,22 +211,16 @@ class ProjectionService {
         .fold<int>(0, (sum, entry) => sum + entry.signedAmountCents);
   }
 
+  static int _confirmedEntriesForMonth(FinancialProfile profile, DateTime month) {
+    return profile.entries
+        .where((entry) => entry.isConfirmed && entry.date.year == month.year && entry.date.month == month.month)
+        .fold<int>(0, (sum, entry) => sum + entry.signedAmountCents);
+  }
+
   static int _plannedPurchasesForMonth(FinancialProfile profile, DateTime month) {
     return profile.plannedPurchases
         .where((purchase) => !purchase.isPurchased && purchase.desiredDate.year == month.year && purchase.desiredDate.month == month.month)
         .fold<int>(0, (sum, purchase) => sum - purchase.amountCents);
-  }
-
-  static int _tripCostsUntil(FinancialProfile profile, DateTime month) {
-    final now = DateTime.now();
-    var cursor = DateTime(now.year, now.month);
-    final end = DateTime(month.year, month.month);
-    var total = 0;
-    while (!cursor.isAfter(end)) {
-      total += _tripCostsForMonth(profile, cursor);
-      cursor = DateTime(cursor.year, cursor.month + 1);
-    }
-    return total;
   }
 
   static int _tripCostsForMonth(FinancialProfile profile, DateTime month) {
@@ -254,4 +274,143 @@ class ProjectionService {
     if (scenario == ForecastScenario.optimistic) return (value * .9).round();
     return value;
   }
+
+  static Map<ExpenseCategory, int> categorySpending(
+    FinancialProfile profile,
+    DateTime month,
+  ) {
+    final normalizedMonth = DateTime(month.year, month.month);
+    final result = <ExpenseCategory, int>{};
+    for (final cat in ExpenseCategory.values) {
+      result[cat] = 0;
+    }
+    for (final entry in profile.entries) {
+      if (entry.kind == TransactionKind.expense &&
+          entry.isConfirmed &&
+          entry.date.year == normalizedMonth.year &&
+          entry.date.month == normalizedMonth.month) {
+        final cat = entry.expenseCategory ?? ExpenseCategory.sonstiges;
+        result[cat] = (result[cat] ?? 0) + entry.amountCents;
+      }
+    }
+    for (final rec in profile.recurringTransactions) {
+      if (rec.kind == TransactionKind.expense) {
+        final cat = rec.expenseCategory ?? ExpenseCategory.sonstiges;
+        result[cat] = (result[cat] ?? 0) + _monthlyEquivalent(rec);
+      }
+    }
+    return result;
+  }
+
+  static List<CategorySpending> categoryBudgetStatus(
+    FinancialProfile profile,
+    DateTime month,
+  ) {
+    final spending = categorySpending(profile, month);
+    return spending.entries.map((e) {
+      final budget = profile.categoryBudgets
+          .where((b) => b.category == e.key)
+          .isEmpty ? null : profile.categoryBudgets.firstWhere((b) => b.category == e.key).monthlyLimitCents;
+      return CategorySpending(
+        category: e.key,
+        spentCents: e.value,
+        budgetLimitCents: budget,
+      );
+    }).toList()
+      ..sort((a, b) => b.spentCents.compareTo(a.spentCents));
+  }
+
+  static int _monthlyEquivalent(RecurringTransaction item) {
+    switch (item.frequency) {
+      case TransactionFrequency.weekly:
+        return (item.amountCents * 52 / 12).round();
+      case TransactionFrequency.yearly:
+        return (item.amountCents / 12).round();
+      case TransactionFrequency.monthly:
+        return item.amountCents;
+      case TransactionFrequency.once:
+        return 0;
+    }
+  }
+
+  static YearReview yearReview(FinancialProfile profile, {int? year}) {
+    final y = year ?? DateTime.now().year;
+    final monthlyData = <MonthReview>[];
+    var totalIncome = 0;
+    var totalExpenses = 0;
+    var bestSavingMonth = 0;
+    var bestSaving = 0;
+
+    for (var m = 1; m <= 12; m++) {
+      final month = DateTime(y, m);
+      final income = profile.recurringTransactions
+          .where((t) => t.kind == TransactionKind.income)
+          .fold<int>(0, (sum, t) => sum + _monthlyEquivalent(t));
+      final fixedExpenses = profile.recurringTransactions
+          .where((t) => t.kind == TransactionKind.expense)
+          .fold<int>(0, (sum, t) => sum + _monthlyEquivalent(t));
+      final variableExpenses = profile.monthlyVariableBudgetCents;
+      final confirmedEntries = _confirmedEntriesForMonth(profile, month);
+      final plannedPurchases = _plannedPurchasesForMonth(profile, month);
+      final tripCosts = _tripCostsForMonth(profile, month);
+      final monthExpenses = fixedExpenses + variableExpenses - confirmedEntries - plannedPurchases + tripCosts;
+      final monthSaving = income - monthExpenses;
+      totalIncome += income;
+      totalExpenses += monthExpenses;
+      if (monthSaving > bestSaving) {
+        bestSaving = monthSaving;
+        bestSavingMonth = m;
+      }
+      monthlyData.add(MonthReview(
+        month: month,
+        incomeCents: income,
+        expensesCents: monthExpenses,
+        savingCents: monthSaving,
+      ));
+    }
+
+    return YearReview(
+      year: y,
+      monthlyData: monthlyData,
+      totalIncomeCents: totalIncome,
+      totalExpensesCents: totalExpenses,
+      savingRatePercent: totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100).round() : 0,
+      bestSavingMonth: bestSavingMonth,
+      bestSavingCents: bestSaving,
+    );
+  }
+}
+
+class MonthReview {
+  final DateTime month;
+  final int incomeCents;
+  final int expensesCents;
+  final int savingCents;
+
+  const MonthReview({
+    required this.month,
+    required this.incomeCents,
+    required this.expensesCents,
+    required this.savingCents,
+  });
+}
+
+class YearReview {
+  final int year;
+  final List<MonthReview> monthlyData;
+  final int totalIncomeCents;
+  final int totalExpensesCents;
+  final int savingRatePercent;
+  final int bestSavingMonth;
+  final int bestSavingCents;
+
+  const YearReview({
+    required this.year,
+    required this.monthlyData,
+    required this.totalIncomeCents,
+    required this.totalExpensesCents,
+    required this.savingRatePercent,
+    required this.bestSavingMonth,
+    required this.bestSavingCents,
+  });
 }

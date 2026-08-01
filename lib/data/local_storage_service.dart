@@ -5,9 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/finance_models.dart';
 
 class LocalStorageService {
-  // v2 intentionally starts with an empty profile so old demo content is not
+  // v3 intentionally starts with an empty profile so old demo content and
+  // automatic reservation semantics are not
   // silently carried into the real planner.
-  static const _profileKey = 'financial_profile_v2';
+  static const _profileKey = 'financial_profile_v3';
 
   Future<FinancialProfile?> loadProfile() async {
     final preferences = await SharedPreferences.getInstance();

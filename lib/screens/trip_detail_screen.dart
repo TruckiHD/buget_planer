@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/finance_models.dart';
 import '../services/projection_service.dart';
+import '../utils/app_theme.dart';
 import '../utils/squircle_container.dart';
+import '../widgets/trip_timeline.dart';
 
 class TripDetailScreen extends StatefulWidget {
   final TripPlan trip;
@@ -24,12 +26,20 @@ class TripDetailScreen extends StatefulWidget {
 
 class _TripDetailScreenState extends State<TripDetailScreen> {
   late TripPlan _trip;
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _surfaceColor => _isDark ? AppColors.darkSurface : AppColors.lightSurface;
+  Color get _mutedColor => _isDark ? AppColors.darkMuted : AppColors.lightMuted;
+  Color get _dividerColor => _isDark ? AppColors.darkDivider : AppColors.lightDivider;
+  Color get _shadowColor => _isDark ? AppColors.darkCardShadow : AppColors.lightCardShadow;
   late final TextEditingController _nameController;
   late final TextEditingController _destinationController;
   late final TextEditingController _fixedController;
   late final TextEditingController _dailyController;
   late final TextEditingController _limitController;
   late final TextEditingController _paidController;
+  late final TextEditingController _reservedController;
+  late final TextEditingController _bufferController;
 
   String? _editingSegmentId;
   String? _editingExpenseId;
@@ -64,6 +74,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     _dailyController = TextEditingController(text: _euros(_trip.dailyBudgetCents));
     _limitController = TextEditingController(text: _trip.budgetLimitCents == 0 ? '' : _euros(_trip.budgetLimitCents));
     _paidController = TextEditingController(text: _euros(_trip.alreadyPaidCents));
+    _reservedController = TextEditingController(text: _trip.reservedCents == 0 ? '' : _euros(_trip.reservedCents));
+    _bufferController = TextEditingController(text: _trip.bufferPercent == 0 ? '' : '${_trip.bufferPercent}');
     _segmentNameController = TextEditingController();
     _segmentLocationController = TextEditingController();
     _hotelController = TextEditingController();
@@ -90,6 +102,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       _dailyController,
       _limitController,
       _paidController,
+      _reservedController,
+      _bufferController,
       _segmentNameController,
       _segmentLocationController,
       _hotelController,
@@ -114,6 +128,11 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         title: const Text('Reise bearbeiten'),
         actions: [
           IconButton(
+            tooltip: 'Reise kopieren',
+            onPressed: _copyTrip,
+            icon: const Icon(Icons.copy_rounded),
+          ),
+          IconButton(
             tooltip: 'Reise löschen',
             onPressed: _deleteTrip,
             icon: const Icon(Icons.delete_outline_rounded),
@@ -130,6 +149,10 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
               children: [
                 _budgetHeader(forecast),
                 const SizedBox(height: 18),
+                if (_trip.segments.isNotEmpty) ...[
+                  _surface(child: TripTimeline(trip: _trip, isDark: _isDark)),
+                  const SizedBox(height: 18),
+                ],
                 _tripBasics(),
                 const SizedBox(height: 18),
                 _segmentsSection(),
@@ -158,14 +181,15 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         ]),
         const SizedBox(height: 22),
         Row(children: [
-          Expanded(child: _metric('Budgetlimit', _trip.budgetLimitCents <= 0 ? 'Kein Limit' : _money(_trip.budgetLimitCents), const Color(0xFF5669E8))),
-          Expanded(child: _metric('Geplant', _money(_trip.totalCostCents), overLimit ? const Color(0xFFD94E5A) : const Color(0xFF20966A))),
-          Expanded(child: _metric('Übrig', _trip.budgetLimitCents <= 0 ? '–' : _money(_trip.budgetRemainingCents), overLimit ? const Color(0xFFD94E5A) : const Color(0xFF20966A))),
+          Expanded(child: _metric('Budgetlimit', _trip.budgetLimitCents <= 0 ? 'Kein Limit' : _money(_trip.budgetLimitCents), AppColors.primary)),
+          Expanded(child: _metric('Geplant', _money(_trip.totalCostCents), overLimit ? AppColors.red : AppColors.green)),
+          Expanded(child: _metric('Übrig', _trip.budgetLimitCents <= 0 ? '–' : _money(_trip.budgetRemainingCents), overLimit ? AppColors.red : AppColors.green)),
         ]),
         const SizedBox(height: 16),
-        if (_trip.budgetLimitCents > 0) ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: (_trip.totalCostCents / _trip.budgetLimitCents).clamp(0.0, 1.0).toDouble(), minHeight: 9, backgroundColor: const Color(0xFFE9ECF4), color: overLimit ? const Color(0xFFD94E5A) : const Color(0xFF5669E8))),
+        if (_trip.budgetLimitCents > 0) ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: (_trip.totalCostCents / _trip.budgetLimitCents).clamp(0.0, 1.0).toDouble(), minHeight: 9, backgroundColor: _dividerColor, color: overLimit ? AppColors.red : AppColors.primary)),
         const SizedBox(height: 12),
         Text('Noch offene Reiseplanung: ${_money(_trip.remainingCostCents)}', style: Theme.of(context).textTheme.bodyMedium),
+        Text('Explizit reserviert: ${_money(_trip.reservedCents)}', style: Theme.of(context).textTheme.bodyMedium),
       ]),
     );
   }
@@ -181,7 +205,11 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         const SizedBox(height: 10),
         Row(children: [Expanded(child: TextField(controller: _limitController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Maximales Budget'))), const SizedBox(width: 10), Expanded(child: TextField(controller: _paidController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Bereits bezahlt')))]),
         const SizedBox(height: 10),
+        TextField(controller: _reservedController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Jetzt ausdrücklich reservieren', helperText: 'Bleibt 0 €, wenn du nur planen und noch nichts blockieren möchtest.')),
+        const SizedBox(height: 10),
         Row(children: [Expanded(child: TextField(controller: _fixedController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Globale feste Kosten'))), const SizedBox(width: 10), Expanded(child: TextField(controller: _dailyController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Basis-Essen / Tag')))]),
+        const SizedBox(height: 10),
+        TextField(controller: _bufferController, keyboardType: TextInputType.number, decoration: const InputDecoration(suffixText: '%', labelText: 'Reisepuffer', helperText: '0 % bedeutet: kein zusätzlicher Puffer.')),
         const SizedBox(height: 14),
         Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: _saveTripBasics, icon: const Icon(Icons.save_outlined), label: const Text('Grundlagen speichern'))),
       ]));
@@ -202,9 +230,12 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
           const SizedBox(height: 10),
           TextField(controller: _hotelController, decoration: const InputDecoration(labelText: 'Hotel / Unterkunft')),
           const SizedBox(height: 10),
-          Row(children: [Expanded(child: TextField(controller: _hotelCostController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Hotel gesamt'))), const SizedBox(width: 10), Expanded(child: TextField(controller: _foodController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Essen / Tag')))]),
+          Row(children: [Expanded(child: TextField(controller: _hotelCostController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Hotel gesamt'))), const SizedBox(width: 10), Expanded(child: TextField(controller: _foodController, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => setState(() {}), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Essen / Tag')))]),
           const SizedBox(height: 8),
           Wrap(spacing: 6, children: [ActionChip(label: const Text('20 € sparsam'), onPressed: () => setState(() => _foodController.text = '20')), ActionChip(label: const Text('35 € normal'), onPressed: () => setState(() => _foodController.text = '35')), ActionChip(label: const Text('55 € komfortabel'), onPressed: () => setState(() => _foodController.text = '55'))]),
+          const SizedBox(height: 8),
+          if (_parseAmount(_foodController.text) > 0)
+            Text('Essensplanung: $_segmentDays Tage x ${_money(_parseAmount(_foodController.text))} = ${_money(_segmentDays * _parseAmount(_foodController.text))}', style: const TextStyle(color: Color(0xFF5669E8), fontWeight: FontWeight.w700)),
           CheckboxListTile(contentPadding: EdgeInsets.zero, value: _segmentPaid, title: const Text('Hotel bereits bezahlt'), onChanged: (value) => setState(() => _segmentPaid = value ?? false)),
           Row(children: [Expanded(child: TextField(controller: _transportController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Transport'))), const SizedBox(width: 10), Expanded(child: TextField(controller: _otherController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Sonstiges')))]),
           const SizedBox(height: 14),
@@ -230,22 +261,22 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         ],
       ]));
 
-  Widget _segmentTile(TripSegment segment) => Dismissible(key: ValueKey(segment.id), direction: DismissDirection.endToStart, background: _deleteBackground(), onDismissed: (_) => _removeSegment(segment), child: ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.hotel_outlined, color: Color(0xFF5669E8)), title: Text('${segment.location} · ${segment.days} Tage'), subtitle: Text('${segment.accommodationName} · ${_money(segment.accommodationCostCents)} · Essen ${_money(segment.dailyFoodBudgetCents)}/Tag'), trailing: IconButton(tooltip: 'Bearbeiten', onPressed: () => _beginSegmentEdit(segment), icon: const Icon(Icons.edit_outlined))));
+  Widget _segmentTile(TripSegment segment) => Dismissible(key: ValueKey(segment.id), direction: DismissDirection.endToStart, background: _deleteBackground(), onDismissed: (_) => _removeSegment(segment), child: ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.hotel_outlined, color: AppColors.primary), title: Text('${segment.location} · ${segment.days} Tage'), subtitle: Text('${segment.accommodationName} · ${_money(segment.accommodationCostCents)} · Essen ${_money(segment.dailyFoodBudgetCents)}/Tag'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [GestureDetector(onTap: () => _toggleSegmentPaid(segment), child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: segment.accommodationPaid ? AppColors.green.withValues(alpha: .12) : AppColors.amber.withValues(alpha: .12), borderRadius: BorderRadius.circular(12)), child: Text(segment.accommodationPaid ? 'Bezahlt' : 'Offen', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: segment.accommodationPaid ? AppColors.green : AppColors.amber)))), IconButton(tooltip: 'Bearbeiten', onPressed: () => _beginSegmentEdit(segment), icon: const Icon(Icons.edit_outlined))])));
 
-  Widget _expenseTile(TripExpense expense) => Dismissible(key: ValueKey(expense.id), direction: DismissDirection.endToStart, background: _deleteBackground(), onDismissed: (_) => _removeExpense(expense), child: ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.receipt_long_outlined, color: Color(0xFFE19A35)), title: Text(expense.title), subtitle: Text('${expense.category} · ${_dateLabel(expense.date)}${expense.isPaid ? ' · bezahlt' : ' · geplant'}'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [Text(_money(expense.amountCents), style: const TextStyle(fontWeight: FontWeight.w700)), IconButton(tooltip: 'Bearbeiten', onPressed: () => _beginExpenseEdit(expense), icon: const Icon(Icons.edit_outlined))])));
-
-  Widget _metric(String label, String value, Color color) => Padding(padding: const EdgeInsets.only(right: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF78839A))), const SizedBox(height: 4), Text(value, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: color))]));
+  Widget _expenseTile(TripExpense expense) => Dismissible(key: ValueKey(expense.id), direction: DismissDirection.endToStart, background: _deleteBackground(), onDismissed: (_) => _removeExpense(expense), child: ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.receipt_long_outlined, color: AppColors.amber), title: Text(expense.title), subtitle: Text('${expense.category} · ${_dateLabel(expense.date)}'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [GestureDetector(onTap: () => _toggleExpensePaid(expense), child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: expense.isPaid ? AppColors.green.withValues(alpha: .12) : AppColors.amber.withValues(alpha: .12), borderRadius: BorderRadius.circular(12)), child: Text(expense.isPaid ? 'Bezahlt' : 'Offen', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: expense.isPaid ? AppColors.green : AppColors.amber)))), Text(_money(expense.amountCents), style: const TextStyle(fontWeight: FontWeight.w700)), IconButton(tooltip: 'Bearbeiten', onPressed: () => _beginExpenseEdit(expense), icon: const Icon(Icons.edit_outlined))])));
+  Widget _metric(String label, String value, Color color) => Padding(padding: const EdgeInsets.only(right: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: TextStyle(fontSize: 11, color: _mutedColor)), const SizedBox(height: 4), Text(value, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: color))]));
 
   Widget _dateButton(String label, DateTime date, VoidCallback onPressed) => OutlinedButton.icon(onPressed: onPressed, icon: const Icon(Icons.event_outlined, size: 18), label: Text('$label ${_dateLabel(date)}'));
 
-  Widget _surface({required Widget child}) => SquircleContainer(borderRadius: BorderRadius.circular(24), padding: const EdgeInsets.all(20), backgroundColor: Colors.white, boxShadow: const [BoxShadow(color: Color(0x0D172033), blurRadius: 18, offset: Offset(0, 7))], child: child);
+  Widget _surface({required Widget child}) => SquircleContainer(borderRadius: BorderRadius.circular(24), padding: const EdgeInsets.all(20), backgroundColor: _surfaceColor, boxShadow: [BoxShadow(color: _shadowColor, blurRadius: 18, offset: const Offset(0, 7))], child: child);
 
-  Widget _statusPill(String label, bool positive) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: (positive ? const Color(0xFF20966A) : const Color(0xFFD94E5A)).withValues(alpha: .11), borderRadius: BorderRadius.circular(20)), child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: positive ? const Color(0xFF20966A) : const Color(0xFFD94E5A))));
+  Widget _statusPill(String label, bool positive) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: (positive ? AppColors.green : AppColors.red).withValues(alpha: .11), borderRadius: BorderRadius.circular(20)), child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: positive ? AppColors.green : AppColors.red)));
 
-  Widget _deleteBackground() => Container(color: const Color(0xFFFFE4E6), alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFD94E5A)));
+  Widget _deleteBackground() => Container(color: AppColors.red.withValues(alpha: .12), alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete_outline_rounded, color: AppColors.red));
 
   Future<void> _saveTripBasics() async {
-    final updated = _trip.copyWith(name: _nameController.text.trim().isEmpty ? _trip.name : _nameController.text.trim(), destination: _destinationController.text.trim(), startsOn: _tripStartsOn, endsOn: _tripEndsOn, fixedCostsCents: _parseAmount(_fixedController.text), dailyBudgetCents: _parseAmount(_dailyController.text), budgetLimitCents: _parseAmount(_limitController.text), alreadyPaidCents: _parseAmount(_paidController.text));
+    final bufferPercent = (int.tryParse(_bufferController.text) ?? 0).clamp(0, 100).toInt();
+    final updated = _trip.copyWith(name: _nameController.text.trim().isEmpty ? _trip.name : _nameController.text.trim(), destination: _destinationController.text.trim(), startsOn: _tripStartsOn, endsOn: _tripEndsOn, fixedCostsCents: _parseAmount(_fixedController.text), dailyBudgetCents: _parseAmount(_dailyController.text), budgetLimitCents: _parseAmount(_limitController.text), bufferPercent: bufferPercent, alreadyPaidCents: _parseAmount(_paidController.text), reservedCents: _parseAmount(_reservedController.text));
     setState(() => _trip = updated);
     await widget.onChanged(updated);
   }
@@ -281,6 +312,18 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
   Future<void> _removeSegment(TripSegment segment) async {
     final updated = _trip.copyWith(segments: _trip.segments.where((item) => item.id != segment.id).toList());
+    setState(() => _trip = updated);
+    await widget.onChanged(updated);
+  }
+
+  Future<void> _toggleSegmentPaid(TripSegment segment) async {
+    final updated = _trip.copyWith(segments: _trip.segments.map((s) => s.id == segment.id ? TripSegment(id: s.id, name: s.name, location: s.location, startsOn: s.startsOn, endsOn: s.endsOn, accommodationName: s.accommodationName, accommodationCostCents: s.accommodationCostCents, dailyFoodBudgetCents: s.dailyFoodBudgetCents, transportCostCents: s.transportCostCents, otherCostCents: s.otherCostCents, accommodationPaid: !s.accommodationPaid) : s).toList());
+    setState(() => _trip = updated);
+    await widget.onChanged(updated);
+  }
+
+  Future<void> _toggleExpensePaid(TripExpense expense) async {
+    final updated = _trip.copyWith(expenses: _trip.expenses.map((e) => e.id == expense.id ? TripExpense(id: e.id, title: e.title, category: e.category, amountCents: e.amountCents, date: e.date, isPaid: !e.isPaid) : e).toList());
     setState(() => _trip = updated);
     await widget.onChanged(updated);
   }
@@ -339,8 +382,51 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     if (mounted) Navigator.pop(context);
   }
 
+  Future<void> _copyTrip() async {
+    final now = DateTime.now();
+    final offset = _trip.endsOn.difference(_trip.startsOn);
+    final newStart = DateTime(now.year + 1, _trip.startsOn.month, _trip.startsOn.day);
+    final newEnd = newStart.add(offset);
+    final copied = TripPlan(
+      id: now.microsecondsSinceEpoch.toString(),
+      name: '${_trip.name} (Kopie)',
+      destination: _trip.destination,
+      startsOn: newStart,
+      endsOn: newEnd,
+      fixedCostsCents: _trip.fixedCostsCents,
+      dailyBudgetCents: _trip.dailyBudgetCents,
+      budgetLimitCents: _trip.budgetLimitCents,
+      bufferPercent: _trip.bufferPercent,
+      segments: _trip.segments.map((s) => TripSegment(
+        id: '${now.microsecondsSinceEpoch}_${s.id}',
+        name: s.name,
+        location: s.location,
+        startsOn: newStart.add(s.startsOn.difference(_trip.startsOn)),
+        endsOn: newStart.add(s.endsOn.difference(_trip.startsOn)),
+        accommodationName: s.accommodationName,
+        accommodationCostCents: s.accommodationCostCents,
+        dailyFoodBudgetCents: s.dailyFoodBudgetCents,
+        transportCostCents: s.transportCostCents,
+        otherCostCents: s.otherCostCents,
+      )).toList(),
+      expenses: _trip.expenses.map((e) => TripExpense(
+        id: '${now.microsecondsSinceEpoch}_${e.id}',
+        title: e.title,
+        category: e.category,
+        amountCents: e.amountCents,
+        date: newStart.add(e.date.difference(_trip.startsOn)),
+      )).toList(),
+    );
+    await widget.onChanged(copied);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reise kopiert!')));
+      Navigator.pop(context);
+    }
+  }
+
   String _euros(int cents) => (cents / 100).toStringAsFixed(2);
   int _parseAmount(String value) => ((double.tryParse(value.replaceAll(',', '.')) ?? 0) * 100).round();
   String _money(int cents) => '${cents < 0 ? '-' : ''}${(cents.abs() / 100).toStringAsFixed(0)} €';
   String _dateLabel(DateTime date) => '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+  int get _segmentDays => _segmentEndsOn.difference(_segmentStartsOn).inDays.clamp(1, 365).toInt();
 }

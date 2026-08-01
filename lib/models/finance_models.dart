@@ -1,8 +1,56 @@
+import 'package:flutter/material.dart';
+
 enum TransactionKind { income, expense }
 
 enum TransactionFrequency { once, monthly, weekly, yearly }
 
 enum ForecastScenario { cautious, realistic, optimistic }
+
+enum ExpenseCategory {
+  wohnen('Wohnen', Icons.home_rounded, Color(0xFF5C6DF2)),
+  lebensmittel('Lebensmittel', Icons.shopping_cart_rounded, Color(0xFF20966A)),
+  transport('Transport', Icons.directions_bus_rounded, Color(0xFFE19A35)),
+  unterhaltung('Unterhaltung', Icons.sports_esports_rounded, Color(0xFFD94E5A)),
+  gesundheit('Gesundheit', Icons.favorite_rounded, Color(0xFFE05B9A)),
+  bildung('Bildung', Icons.school_rounded, Color(0xFF7B61FF)),
+  vertrag('Verträge & Abos', Icons.subscriptions_rounded, Color(0xFF00B8D9)),
+  geschenke('Geschenke', Icons.card_giftcard_rounded, Color(0xFFFF6D00)),
+  sonstiges('Sonstiges', Icons.more_horiz_rounded, Color(0xFF78839A));
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const ExpenseCategory(this.label, this.icon, this.color);
+
+  static ExpenseCategory fromString(String value) {
+    for (final cat in ExpenseCategory.values) {
+      if (cat.name == value || cat.label == value) return cat;
+    }
+    return ExpenseCategory.sonstiges;
+  }
+}
+
+enum IncomeCategory {
+  gehalt('Gehalt', Icons.work_rounded, Color(0xFF20966A)),
+  freelance('Freelance', Icons.laptop_mac_rounded, Color(0xFF5C6DF2)),
+  investitionen('Investitionen', Icons.trending_up_rounded, Color(0xFFE19A35)),
+  geschenk('Geschenk', Icons.card_giftcard_rounded, Color(0xFFFF6D00)),
+  sonstiges('Sonstiges', Icons.more_horiz_rounded, Color(0xFF78839A));
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const IncomeCategory(this.label, this.icon, this.color);
+
+  static IncomeCategory fromString(String value) {
+    for (final cat in IncomeCategory.values) {
+      if (cat.name == value || cat.label == value) return cat;
+    }
+    return IncomeCategory.sonstiges;
+  }
+}
 
 DateTime _date(String value) => DateTime.parse(value);
 String _dateValue(DateTime value) => value.toIso8601String();
@@ -13,7 +61,8 @@ class CashFlowEntry {
   final int amountCents;
   final DateTime date;
   final TransactionKind kind;
-  final String category;
+  final ExpenseCategory? expenseCategory;
+  final IncomeCategory? incomeCategory;
   final bool isConfirmed;
 
   const CashFlowEntry({
@@ -22,12 +71,25 @@ class CashFlowEntry {
     required this.amountCents,
     required this.date,
     required this.kind,
-    required this.category,
+    this.expenseCategory,
+    this.incomeCategory,
     this.isConfirmed = false,
   });
 
   int get signedAmountCents =>
       kind == TransactionKind.income ? amountCents : -amountCents;
+
+  String get categoryLabel => kind == TransactionKind.income
+      ? (incomeCategory ?? IncomeCategory.sonstiges).label
+      : (expenseCategory ?? ExpenseCategory.sonstiges).label;
+
+  IconData get categoryIcon => kind == TransactionKind.income
+      ? (incomeCategory ?? IncomeCategory.sonstiges).icon
+      : (expenseCategory ?? ExpenseCategory.sonstiges).icon;
+
+  Color get categoryColor => kind == TransactionKind.income
+      ? (incomeCategory ?? IncomeCategory.sonstiges).color
+      : (expenseCategory ?? ExpenseCategory.sonstiges).color;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -35,19 +97,38 @@ class CashFlowEntry {
         'amountCents': amountCents,
         'date': _dateValue(date),
         'kind': kind.name,
-        'category': category,
+        'expenseCategory': expenseCategory?.name,
+        'incomeCategory': incomeCategory?.name,
         'isConfirmed': isConfirmed,
       };
 
-  factory CashFlowEntry.fromJson(Map<String, dynamic> json) => CashFlowEntry(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        amountCents: json['amountCents'] as int,
-        date: _date(json['date'] as String),
-        kind: TransactionKind.values.byName(json['kind'] as String),
-        category: json['category'] as String,
-        isConfirmed: json['isConfirmed'] as bool? ?? false,
-      );
+  factory CashFlowEntry.fromJson(Map<String, dynamic> json) {
+    final kind = TransactionKind.values.byName(json['kind'] as String);
+    ExpenseCategory? expCat;
+    IncomeCategory? incCat;
+    if (json['expenseCategory'] != null) {
+      expCat = ExpenseCategory.fromString(json['expenseCategory'] as String);
+    } else if (json['incomeCategory'] != null) {
+      incCat = IncomeCategory.fromString(json['incomeCategory'] as String);
+    } else if (json['category'] != null) {
+      final raw = json['category'] as String;
+      if (kind == TransactionKind.expense) {
+        expCat = ExpenseCategory.fromString(raw);
+      } else {
+        incCat = IncomeCategory.fromString(raw);
+      }
+    }
+    return CashFlowEntry(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      amountCents: json['amountCents'] as int,
+      date: _date(json['date'] as String),
+      kind: kind,
+      expenseCategory: expCat,
+      incomeCategory: incCat,
+      isConfirmed: json['isConfirmed'] as bool? ?? false,
+    );
+  }
 }
 
 class RecurringTransaction {
@@ -55,7 +136,8 @@ class RecurringTransaction {
   final String title;
   final int amountCents;
   final TransactionKind kind;
-  final String category;
+  final ExpenseCategory? expenseCategory;
+  final IncomeCategory? incomeCategory;
   final TransactionFrequency frequency;
   final int dayOfMonth;
   final DateTime startsOn;
@@ -65,7 +147,8 @@ class RecurringTransaction {
     required this.title,
     required this.amountCents,
     required this.kind,
-    required this.category,
+    this.expenseCategory,
+    this.incomeCategory,
     this.frequency = TransactionFrequency.monthly,
     this.dayOfMonth = 1,
     required this.startsOn,
@@ -74,27 +157,58 @@ class RecurringTransaction {
   int get signedAmountCents =>
       kind == TransactionKind.income ? amountCents : -amountCents;
 
+  String get categoryLabel => kind == TransactionKind.income
+      ? (incomeCategory ?? IncomeCategory.sonstiges).label
+      : (expenseCategory ?? ExpenseCategory.sonstiges).label;
+
+  IconData get categoryIcon => kind == TransactionKind.income
+      ? (incomeCategory ?? IncomeCategory.sonstiges).icon
+      : (expenseCategory ?? ExpenseCategory.sonstiges).icon;
+
+  Color get categoryColor => kind == TransactionKind.income
+      ? (incomeCategory ?? IncomeCategory.sonstiges).color
+      : (expenseCategory ?? ExpenseCategory.sonstiges).color;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
         'amountCents': amountCents,
         'kind': kind.name,
-        'category': category,
+        'expenseCategory': expenseCategory?.name,
+        'incomeCategory': incomeCategory?.name,
         'frequency': frequency.name,
         'dayOfMonth': dayOfMonth,
         'startsOn': _dateValue(startsOn),
       };
 
-  factory RecurringTransaction.fromJson(Map<String, dynamic> json) => RecurringTransaction(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        amountCents: json['amountCents'] as int,
-        kind: TransactionKind.values.byName(json['kind'] as String),
-        category: json['category'] as String,
-        frequency: TransactionFrequency.values.byName(json['frequency'] as String),
-        dayOfMonth: json['dayOfMonth'] as int? ?? 1,
-        startsOn: _date(json['startsOn'] as String),
-      );
+  factory RecurringTransaction.fromJson(Map<String, dynamic> json) {
+    final kind = TransactionKind.values.byName(json['kind'] as String);
+    ExpenseCategory? expCat;
+    IncomeCategory? incCat;
+    if (json['expenseCategory'] != null) {
+      expCat = ExpenseCategory.fromString(json['expenseCategory'] as String);
+    } else if (json['incomeCategory'] != null) {
+      incCat = IncomeCategory.fromString(json['incomeCategory'] as String);
+    } else if (json['category'] != null) {
+      final raw = json['category'] as String;
+      if (kind == TransactionKind.expense) {
+        expCat = ExpenseCategory.fromString(raw);
+      } else {
+        incCat = IncomeCategory.fromString(raw);
+      }
+    }
+    return RecurringTransaction(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      amountCents: json['amountCents'] as int,
+      kind: kind,
+      expenseCategory: expCat,
+      incomeCategory: incCat,
+      frequency: TransactionFrequency.values.byName(json['frequency'] as String),
+      dayOfMonth: json['dayOfMonth'] as int? ?? 1,
+      startsOn: _date(json['startsOn'] as String),
+    );
+  }
 }
 
 class TripSegment {
@@ -192,6 +306,15 @@ class TripExpense {
       );
 }
 
+class TripGap {
+  final DateTime start;
+  final DateTime end;
+
+  const TripGap({required this.start, required this.end});
+
+  int get days => end.difference(start).inDays;
+}
+
 class TripPlan {
   final String id;
   final String name;
@@ -203,6 +326,7 @@ class TripPlan {
   final int budgetLimitCents;
   final int bufferPercent;
   final int alreadyPaidCents;
+  final int reservedCents;
   final List<TripSegment> segments;
   final List<TripExpense> expenses;
 
@@ -215,8 +339,9 @@ class TripPlan {
     required this.fixedCostsCents,
     required this.dailyBudgetCents,
     this.budgetLimitCents = 0,
-    this.bufferPercent = 15,
+    this.bufferPercent = 0,
     this.alreadyPaidCents = 0,
+    this.reservedCents = 0,
     this.segments = const [],
     this.expenses = const [],
   });
@@ -262,6 +387,32 @@ class TripPlan {
       ? dailyBudgetCents
       : (segmentFoodCents / segments.fold<int>(0, (sum, segment) => sum + segment.days)).round();
 
+  List<TripGap> get gaps {
+    if (segments.isEmpty) return [TripGap(start: startsOn, end: endsOn)];
+    final sorted = [...segments]..sort((a, b) => a.startsOn.compareTo(b.startsOn));
+    final result = <TripGap>[];
+    if (sorted.first.startsOn.isAfter(startsOn)) {
+      result.add(TripGap(start: startsOn, end: sorted.first.startsOn));
+    }
+    for (var i = 0; i < sorted.length - 1; i++) {
+      final currentEnd = sorted[i].endsOn;
+      final nextStart = sorted[i + 1].startsOn;
+      if (nextStart.isAfter(currentEnd)) {
+        result.add(TripGap(start: currentEnd, end: nextStart));
+      }
+    }
+    if (sorted.last.endsOn.isBefore(endsOn)) {
+      result.add(TripGap(start: sorted.last.endsOn, end: endsOn));
+    }
+    return result;
+  }
+
+  int get uncoveredDays => gaps.fold<int>(0, (sum, gap) => sum + gap.days);
+
+  int get coveredDays => days - uncoveredDays;
+
+  double get coveragePercent => days > 0 ? (coveredDays / days).clamp(0.0, 1.0) : 0.0;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
@@ -273,6 +424,7 @@ class TripPlan {
         'budgetLimitCents': budgetLimitCents,
         'bufferPercent': bufferPercent,
         'alreadyPaidCents': alreadyPaidCents,
+        'reservedCents': reservedCents,
         'segments': segments.map((segment) => segment.toJson()).toList(),
         'expenses': expenses.map((expense) => expense.toJson()).toList(),
       };
@@ -286,8 +438,9 @@ class TripPlan {
         fixedCostsCents: json['fixedCostsCents'] as int,
         dailyBudgetCents: json['dailyBudgetCents'] as int,
         budgetLimitCents: json['budgetLimitCents'] as int? ?? 0,
-        bufferPercent: json['bufferPercent'] as int? ?? 15,
+        bufferPercent: json['bufferPercent'] as int? ?? 0,
         alreadyPaidCents: json['alreadyPaidCents'] as int? ?? 0,
+        reservedCents: json['reservedCents'] as int? ?? 0,
         segments: (json['segments'] as List<dynamic>? ?? [])
             .map((item) => TripSegment.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList(),
@@ -306,6 +459,7 @@ class TripPlan {
     int? budgetLimitCents,
     int? bufferPercent,
     int? alreadyPaidCents,
+    int? reservedCents,
     List<TripSegment>? segments,
     List<TripExpense>? expenses,
   }) {
@@ -320,6 +474,7 @@ class TripPlan {
       budgetLimitCents: budgetLimitCents ?? this.budgetLimitCents,
       bufferPercent: bufferPercent ?? this.bufferPercent,
       alreadyPaidCents: alreadyPaidCents ?? this.alreadyPaidCents,
+      reservedCents: reservedCents ?? this.reservedCents,
       segments: segments ?? this.segments,
       expenses: expenses ?? this.expenses,
     );
@@ -329,40 +484,46 @@ class TripPlan {
 class PlannedPurchase {
   final String id;
   final String title;
-  final String category;
+  final ExpenseCategory category;
   final int amountCents;
   final DateTime desiredDate;
   final int priority;
   final bool isPurchased;
+  final bool isReserved;
 
   const PlannedPurchase({
     required this.id,
     required this.title,
-    required this.category,
+    this.category = ExpenseCategory.sonstiges,
     required this.amountCents,
     required this.desiredDate,
     this.priority = 1,
     this.isPurchased = false,
+    this.isReserved = false,
   });
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
-        'category': category,
+        'category': category.name,
         'amountCents': amountCents,
         'desiredDate': _dateValue(desiredDate),
         'priority': priority,
         'isPurchased': isPurchased,
+        'isReserved': isReserved,
       };
 
   factory PlannedPurchase.fromJson(Map<String, dynamic> json) => PlannedPurchase(
         id: json['id'] as String,
         title: json['title'] as String,
-        category: json['category'] as String,
+        category: json['category'] != null
+            ? ExpenseCategory.fromString(json['category'] as String)
+            : ExpenseCategory.sonstiges,
         amountCents: json['amountCents'] as int,
         desiredDate: _date(json['desiredDate'] as String),
         priority: json['priority'] as int? ?? 1,
         isPurchased: json['isPurchased'] as bool? ?? false,
+        isReserved: json['isReserved'] as bool? ?? false,
       );
 }
 
@@ -410,6 +571,26 @@ class SavingsGoal {
       );
 }
 
+class CategoryBudget {
+  final ExpenseCategory category;
+  final int monthlyLimitCents;
+
+  const CategoryBudget({
+    required this.category,
+    required this.monthlyLimitCents,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'category': category.name,
+        'monthlyLimitCents': monthlyLimitCents,
+      };
+
+  factory CategoryBudget.fromJson(Map<String, dynamic> json) => CategoryBudget(
+        category: ExpenseCategory.fromString(json['category'] as String),
+        monthlyLimitCents: json['monthlyLimitCents'] as int,
+      );
+}
+
 class FinancialProfile {
   final int currentBalanceCents;
   final int safetyReserveCents;
@@ -419,6 +600,7 @@ class FinancialProfile {
   final List<TripPlan> trips;
   final List<SavingsGoal> goals;
   final List<PlannedPurchase> plannedPurchases;
+  final List<CategoryBudget> categoryBudgets;
 
   const FinancialProfile({
     required this.currentBalanceCents,
@@ -429,6 +611,7 @@ class FinancialProfile {
     this.trips = const [],
     this.goals = const [],
     this.plannedPurchases = const [],
+    this.categoryBudgets = const [],
   });
 
   int get monthlyIncomeCents => recurringTransactions
@@ -446,7 +629,7 @@ class FinancialProfile {
       monthlyGoalAllocationsCents;
 
   int get reservedTripCents =>
-      trips.fold<int>(0, (sum, trip) => sum + trip.remainingCostCents);
+      trips.fold<int>(0, (sum, trip) => sum + trip.reservedCents);
 
   int get reservedGoalCents =>
       goals.fold<int>(0, (sum, goal) => sum + goal.remainingCents);
@@ -455,7 +638,7 @@ class FinancialProfile {
       goals.fold<int>(0, (sum, goal) => sum + goal.monthlyAllocationCents);
 
   int get reservedPurchaseCents => plannedPurchases
-      .where((purchase) => !purchase.isPurchased)
+      .where((purchase) => !purchase.isPurchased && purchase.isReserved)
       .fold<int>(0, (sum, purchase) => sum + purchase.amountCents);
 
   int get freeBalanceCents => currentBalanceCents -
@@ -489,6 +672,7 @@ class FinancialProfile {
     List<TripPlan>? trips,
     List<SavingsGoal>? goals,
     List<PlannedPurchase>? plannedPurchases,
+    List<CategoryBudget>? categoryBudgets,
   }) {
     return FinancialProfile(
       currentBalanceCents: currentBalanceCents ?? this.currentBalanceCents,
@@ -499,6 +683,7 @@ class FinancialProfile {
       trips: trips ?? this.trips,
       goals: goals ?? this.goals,
       plannedPurchases: plannedPurchases ?? this.plannedPurchases,
+      categoryBudgets: categoryBudgets ?? this.categoryBudgets,
     );
   }
 
@@ -511,6 +696,7 @@ class FinancialProfile {
         'trips': trips.map((trip) => trip.toJson()).toList(),
         'goals': goals.map((goal) => goal.toJson()).toList(),
         'plannedPurchases': plannedPurchases.map((purchase) => purchase.toJson()).toList(),
+        'categoryBudgets': categoryBudgets.map((budget) => budget.toJson()).toList(),
       };
 
   factory FinancialProfile.fromJson(Map<String, dynamic> json) => FinancialProfile(
@@ -531,6 +717,9 @@ class FinancialProfile {
             .toList(),
         plannedPurchases: (json['plannedPurchases'] as List<dynamic>? ?? [])
             .map((item) => PlannedPurchase.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList(),
+        categoryBudgets: (json['categoryBudgets'] as List<dynamic>? ?? [])
+            .map((item) => CategoryBudget.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList(),
       );
 }
