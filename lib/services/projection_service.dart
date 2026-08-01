@@ -277,8 +277,9 @@ class ProjectionService {
 
   static Map<ExpenseCategory, int> categorySpending(
     FinancialProfile profile,
-    DateTime month,
-  ) {
+    DateTime month, {
+    bool includePlanned = false,
+  }) {
     final normalizedMonth = DateTime(month.year, month.month);
     final result = <ExpenseCategory, int>{};
     for (final cat in ExpenseCategory.values) {
@@ -286,7 +287,7 @@ class ProjectionService {
     }
     for (final entry in profile.entries) {
       if (entry.kind == TransactionKind.expense &&
-          entry.isConfirmed &&
+          (includePlanned || entry.isConfirmed) &&
           entry.date.year == normalizedMonth.year &&
           entry.date.month == normalizedMonth.month) {
         final cat = entry.expenseCategory ?? ExpenseCategory.sonstiges;
@@ -343,9 +344,14 @@ class ProjectionService {
 
     for (var m = 1; m <= 12; m++) {
       final month = DateTime(y, m);
-      final income = profile.recurringTransactions
+      final recurringIncome = profile.recurringTransactions
           .where((t) => t.kind == TransactionKind.income)
           .fold<int>(0, (sum, t) => sum + _monthlyEquivalent(t));
+      final plannedIncome = profile.entries
+          .where((e) => !e.isConfirmed && e.kind == TransactionKind.income && e.date.year == month.year && e.date.month == month.month)
+          .fold<int>(0, (sum, e) => sum + e.amountCents);
+      final income = recurringIncome + plannedIncome;
+      
       final fixedExpenses = profile.recurringTransactions
           .where((t) => t.kind == TransactionKind.expense)
           .fold<int>(0, (sum, t) => sum + _monthlyEquivalent(t));

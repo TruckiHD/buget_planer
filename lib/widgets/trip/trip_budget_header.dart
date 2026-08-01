@@ -21,7 +21,9 @@ class TripBudgetHeader extends StatelessWidget {
     final surfaceColor = isDark ? AppColors.darkSurface : AppColors.lightSurface;
     final shadowColor = isDark ? AppColors.darkCardShadow : AppColors.lightCardShadow;
     final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
     final dividerColor = isDark ? AppColors.darkDivider : AppColors.lightDivider;
+    final fundingProgress = trip.totalCostCents <= 0 ? 0.0 : (trip.paidCents / trip.totalCostCents).clamp(0.0, 1.0).toDouble();
 
     return SquircleContainer(
       borderRadius: BorderRadius.circular(24),
@@ -30,49 +32,70 @@ class TripBudgetHeader extends StatelessWidget {
       boxShadow: [BoxShadow(color: shadowColor, blurRadius: 18, offset: const Offset(0, 7))],
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.flight_takeoff_rounded, color: AppColors.primary, size: 22),
+          ),
+          const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(trip.name, style: Theme.of(context).textTheme.headlineSmall),
-            Text('${trip.destination} · ${trip.days} Tage', style: Theme.of(context).textTheme.bodyMedium),
+            Text(trip.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: textColor)),
+            const SizedBox(height: 2),
+            Text('${trip.destination} · ${trip.days} Tage', style: TextStyle(fontSize: 13, color: mutedColor)),
           ])),
           _statusPill(overLimit ? 'Über Budget' : 'Im Budget', !overLimit),
         ]),
-        const SizedBox(height: 22),
+        const SizedBox(height: 18),
         Row(children: [
-          Expanded(child: _metric('Budgetlimit', trip.budgetLimitCents <= 0 ? 'Kein Limit' : _money(trip.budgetLimitCents), AppColors.primary, mutedColor)),
-          Expanded(child: _metric('Geplant', _money(trip.totalCostCents), overLimit ? AppColors.red : AppColors.green, mutedColor)),
-          Expanded(child: _metric('Übrig', trip.budgetLimitCents <= 0 ? '–' : _money(trip.budgetRemainingCents), overLimit ? AppColors.red : AppColors.green, mutedColor)),
+          _metric('Geplant', _money(trip.totalCostCents), overLimit ? AppColors.red : AppColors.green, mutedColor),
+          const SizedBox(width: 20),
+          if (trip.budgetLimitCents > 0) _metric('Limit', _money(trip.budgetLimitCents), AppColors.primary, mutedColor),
+          if (trip.budgetLimitCents > 0) const SizedBox(width: 20),
+          _metric('Offen', _money(trip.remainingCostCents), overLimit ? AppColors.red : AppColors.green, mutedColor),
+          const SizedBox(width: 20),
+          _metric('Bezahlt', _money(trip.paidCents), AppColors.green, mutedColor),
         ]),
-        const SizedBox(height: 16),
         if (trip.budgetLimitCents > 0) ...[
+          const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
               value: (trip.totalCostCents / trip.budgetLimitCents).clamp(0.0, 1.0).toDouble(),
-              minHeight: 9,
+              minHeight: 8,
               backgroundColor: dividerColor,
               color: overLimit ? AppColors.red : AppColors.primary,
             ),
           ),
-          const SizedBox(height: 12),
         ],
+        const SizedBox(height: 18),
         TripCostBreakdown(trip: trip, isDark: isDark),
         const SizedBox(height: 12),
-        Row(children: [
-          Icon(Icons.info_outline_rounded, size: 16, color: mutedColor),
-          const SizedBox(width: 6),
-          Expanded(child: Text('Noch offen: ${_money(trip.remainingCostCents)} · Reserviert: ${_money(trip.reservedCents)}', style: TextStyle(fontSize: 12, color: mutedColor))),
-        ]),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: LinearProgressIndicator(
+            value: fundingProgress,
+            minHeight: 6,
+            backgroundColor: dividerColor,
+            color: AppColors.green,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text('${(fundingProgress * 100).round()}% finanziert', style: TextStyle(fontSize: 12, color: mutedColor)),
       ]),
     );
   }
 
-  Widget _metric(String label, String value, Color color, Color mutedColor) => Padding(
-    padding: const EdgeInsets.only(right: 8),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget _metric(String label, String value, Color color, Color mutedColor) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
       Text(label, style: TextStyle(fontSize: 11, color: mutedColor)),
-      const SizedBox(height: 4),
-      Text(value, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: color)),
-    ]),
+      const SizedBox(height: 2),
+      Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+    ],
   );
 
   Widget _statusPill(String label, bool positive) => Container(
@@ -81,7 +104,11 @@ class TripBudgetHeader extends StatelessWidget {
       color: (positive ? AppColors.green : AppColors.red).withValues(alpha: .11),
       borderRadius: BorderRadius.circular(20),
     ),
-    child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: positive ? AppColors.green : AppColors.red)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(positive ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded, size: 14, color: positive ? AppColors.green : AppColors.red),
+      const SizedBox(width: 4),
+      Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: positive ? AppColors.green : AppColors.red)),
+    ]),
   );
 
   String _money(int cents) => '${cents < 0 ? '-' : ''}${(cents.abs() / 100).toStringAsFixed(0)} €';

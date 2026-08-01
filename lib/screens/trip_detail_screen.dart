@@ -50,10 +50,39 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_trip.name),
+        title: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.flight_takeoff_rounded, color: AppColors.primary, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_trip.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                if (_trip.destination.isNotEmpty)
+                  Text(_trip.destination, style: TextStyle(fontSize: 12, color: _isDark ? AppColors.darkMuted : AppColors.lightMuted)),
+              ],
+            )),
+          ],
+        ),
         actions: [
-          IconButton(tooltip: 'Reise kopieren', onPressed: _copyTrip, icon: const Icon(Icons.copy_rounded)),
-          IconButton(tooltip: 'Reise löschen', onPressed: _deleteTrip, icon: const Icon(Icons.delete_outline_rounded)),
+          IconButton(
+            tooltip: 'Reise kopieren',
+            onPressed: _copyTrip,
+            icon: const Icon(Icons.copy_rounded, size: 20),
+          ),
+          IconButton(
+            tooltip: 'Reise löschen',
+            onPressed: _deleteTrip,
+            icon: const Icon(Icons.delete_outline_rounded, size: 20),
+          ),
         ],
       ),
       body: LayoutBuilder(builder: (context, constraints) {
@@ -66,6 +95,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const SizedBox(height: 12),
                   TripBudgetHeader(trip: _trip, isDark: _isDark),
                   const SizedBox(height: 12),
                   _collapsibleSection(
@@ -127,16 +157,19 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [BoxShadow(color: _shadowColor, blurRadius: 12, offset: const Offset(0, 4))],
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-          initiallyExpanded: initiallyExpanded,
-          leading: Icon(icon, color: AppColors.primary, size: 20),
-          title: Text(title, style: Theme.of(context).textTheme.titleMedium),
-          shape: const Border(),
-          children: [child],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+            childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+            initiallyExpanded: initiallyExpanded,
+            leading: Icon(icon, color: AppColors.primary, size: 20),
+            title: Text(title, style: Theme.of(context).textTheme.titleMedium),
+            shape: const Border(),
+            children: [child],
+          ),
         ),
       ),
     );

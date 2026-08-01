@@ -101,13 +101,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     NavigationDestination(icon: Icon(Icons.shopping_bag_outlined), label: 'Anschaffungen'),
                   ],
                 ),
-          floatingActionButton: _selectedIndex <= 4
-              ? FloatingActionButton.extended(
-                  onPressed: _selectedIndex == 0 ? _showAddIncome : _selectedIndex == 1 ? _openNewTrip : _selectedIndex == 2 ? _showAddCashflow : _selectedIndex == 3 ? _showAddGoal : _showAddPurchase,
-                  icon: const Icon(Icons.add_rounded),
-                  label: Text(_selectedIndex == 0 ? 'Plus hinzufügen' : _selectedIndex == 1 ? 'Reise hinzufügen' : _selectedIndex == 2 ? 'Buchung hinzufügen' : _selectedIndex == 3 ? 'Ziel hinzufügen' : 'Anschaffung planen'),
-                )
-              : null,
         );
       },
     );
@@ -163,20 +156,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 title: 'Jahresrückblick',
                 initiallyExpanded: false,
                 child: _yearReviewCard(),
-              ),
-              const SizedBox(height: 12),
-              _dashboardCollapsible(
-                icon: Icons.flight_takeoff_rounded,
-                title: 'Nächstes Ziel',
-                initiallyExpanded: false,
-                child: _profile.trips.isEmpty
-                    ? _surface(child: EmptyState(
-                        icon: Icons.flight_takeoff_rounded,
-                        title: 'Noch keine Reise geplant',
-                        subtitle: 'Erstelle dein erstes Ziel über den Reisen-Bereich.',
-                        isDark: _isDark,
-                      ))
-                    : _tripCard(_profile.trips.first),
               ),
               const SizedBox(height: 12),
               _dashboardCollapsible(
@@ -292,29 +271,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 12),
         ...insights.map((insight) => Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: _surface(child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(color: insight.color.withValues(alpha: .12), borderRadius: BorderRadius.circular(12)),
-                child: Icon(insight.icon, color: insight.color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(insight.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                  const SizedBox(height: 2),
-                  Text(insight.description, style: TextStyle(fontSize: 13, color: _mutedColor, height: 1.3)),
-                ],
-              )),
-            ],
-          )),
+          child: _insightCard(insight),
         )),
       ],
     );
   }
+
+  Widget _insightCard(Insight insight) {
+    final isDark = _isDark;
+    final bgColor = isDark
+        ? insight.color.withValues(alpha: .08)
+        : insight.color.withValues(alpha: .04);
+    final accentColor = insight.color;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: _surfaceColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: _shadowColor, blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              Container(width: 5, color: accentColor),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: .12),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(insight.icon, color: accentColor, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(insight.title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: _textColor)),
+                            const SizedBox(height: 4),
+                            Text(insight.description, style: TextStyle(fontSize: 13, color: _mutedColor, height: 1.4)),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: bgColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _insightTypeLabel(insight.type),
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: accentColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _insightTypeLabel(InsightType type) => switch (type) {
+    InsightType.warning => 'Achtung',
+    InsightType.success => 'Gut',
+    InsightType.info => 'Info',
+    InsightType.tip => 'Tipp',
+  };
 
   Widget _categoryChartCard() {
     final spending = ProjectionService.categoryBudgetStatus(_profile, DateTime.now());
@@ -424,6 +459,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const SizedBox(height: 12),
       _flowLine('Einnahmen', snapshot.incomeCents, const Color(0xFF20966A), Icons.arrow_downward_rounded),
       _flowLine('Fixkosten & Alltag', -(snapshot.fixedExpensesCents + snapshot.variableExpensesCents), const Color(0xFFD94E5A), Icons.arrow_upward_rounded),
+      if (snapshot.plannedEntriesCents != 0) _flowLine('Geplante Buchungen', snapshot.plannedEntriesCents, snapshot.plannedEntriesCents >= 0 ? const Color(0xFF20966A) : const Color(0xFFE19A35), Icons.event_note_rounded),
       if (snapshot.plannedPurchasesCents > 0) _flowLine('Geplante Anschaffungen', -snapshot.plannedPurchasesCents, const Color(0xFFE19A35), Icons.shopping_bag_outlined),
       if (snapshot.plannedTripCostsCents > 0) _flowLine('Reisezahlungen', -snapshot.plannedTripCostsCents, const Color(0xFF5669E8), Icons.flight_takeoff_rounded),
       const Divider(height: 20),
@@ -435,56 +471,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [Container(width: 30, height: 30, decoration: BoxDecoration(color: color.withValues(alpha: .11), shape: BoxShape.circle), child: Icon(icon, size: 16, color: color)), const SizedBox(width: 12), Expanded(child: Text(label, style: TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.w500))), Text(_money(amount), style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.w600, color: amount < 0 ? AppColors.red : _textColor))]));
   }
 
-  Widget _tripCard(TripPlan trip) {
-    final forecast = ProjectionService.forecastTrip(_profile, trip, scenario: _scenario);
-    final fundingProgress = trip.totalCostCents <= 0 ? 0.0 : (trip.paidCents / trip.totalCostCents).clamp(0.0, 1.0).toDouble();
-    final costProgress = trip.budgetLimitCents <= 0 ? 0.0 : (trip.totalCostCents / trip.budgetLimitCents).clamp(0.0, 1.0).toDouble();
-    return _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(color: _chipBgColor, borderRadius: BorderRadius.circular(16)),
-            child: Center(child: Icon(Icons.flight_takeoff_rounded, color: AppColors.primary)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(trip.name, style: Theme.of(context).textTheme.titleMedium),
-                Text('${trip.destination} · ${trip.days} Tage', style: Theme.of(context).textTheme.bodyMedium),
-              ],
-            ),
-          ),
-          _statusPill(trip.isOverBudget ? 'Über Budget' : forecast.isOnTrack ? 'Im Plan' : 'Nachjustieren', !trip.isOverBudget && forecast.isOnTrack),
-        ],
-      ),
-      const SizedBox(height: 22),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Reisebudget'), Text(_money(trip.totalCostCents), style: const TextStyle(fontWeight: FontWeight.w700))]),
-      if (trip.budgetLimitCents > 0) ...[
-        const SizedBox(height: 4),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Dein Limit'), Text(_money(trip.budgetLimitCents), style: const TextStyle(fontWeight: FontWeight.w700))]),
-        const SizedBox(height: 4),
-        Text(trip.isOverBudget ? 'Aktuell ${_money(-trip.budgetRemainingCents)} über deinem Limit' : '${_money(trip.budgetRemainingCents)} bleiben im Limit übrig', style: TextStyle(color: trip.isOverBudget ? const Color(0xFFD94E5A) : const Color(0xFF20966A), fontSize: 12, fontWeight: FontWeight.w600)),
-      ],
-      const SizedBox(height: 8),
-      Text('Kosten geplant · ${_money(trip.totalCostCents)} von ${trip.budgetLimitCents > 0 ? _money(trip.budgetLimitCents) : 'ohne Limit'}', style: Theme.of(context).textTheme.bodyMedium),
-      const SizedBox(height: 6),
-      if (trip.budgetLimitCents > 0)
-        ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: costProgress, minHeight: 8, backgroundColor: const Color(0xFFE9ECF4), color: trip.isOverBudget ? const Color(0xFFD94E5A) : const Color(0xFF5669E8)))
-      else
-        const Text('Kein Budgetlimit gesetzt', style: TextStyle(fontSize: 12, color: Color(0xFF78839A))),
-      const SizedBox(height: 10),
-      Text('Finanziert · ${_money(trip.paidCents)} von ${_money(trip.totalCostCents)}', style: Theme.of(context).textTheme.bodyMedium),
-      const SizedBox(height: 6),
-      ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: fundingProgress, minHeight: 6, backgroundColor: const Color(0xFFE9ECF4), color: const Color(0xFF20966A))),
-      const SizedBox(height: 18),
-      Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: _isDark ? AppColors.darkSurface2 : const Color(0xFFF5F7FB), borderRadius: BorderRadius.circular(16)), child: Row(children: [const Icon(Icons.lightbulb_outline_rounded, color: AppColors.amber), const SizedBox(width: 10), Expanded(child: Text('Du brauchst ${_money(forecast.requiredMonthlySavingCents)} monatlich, damit am Reisetag auch die Reserve bleibt.', style: const TextStyle(fontSize: 13, height: 1.35)))])),
-      Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () => _openTrip(trip), icon: const Icon(Icons.edit_calendar_outlined, size: 18), label: const Text('Reise öffnen & bearbeiten'))),
-    ]));
-  }
 
   Widget _scenarioCard() {
     if (_profile.trips.isEmpty) {
@@ -499,145 +485,746 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ]));
   }
 
-  Widget _tripsPage() => _pageScaffold('Reisen', 'Alle Ziele und ihre Finanzierung', [
-        if (_profile.trips.isEmpty)
-          _surface(child: EmptyState(
-            icon: Icons.flight_takeoff_rounded,
-            title: 'Noch keine Reise geplant',
-            subtitle: 'Plane dein erstes Ziel und behalte die Kosten im Blick.',
-            actionLabel: 'Reise anlegen',
-            onAction: _openNewTrip,
-            isDark: _isDark,
-          ))
-        else
-          ..._profile.trips.map(_tripCard),
-      ]);
+  Widget _tripsPage() {
+    final sortedTrips = [..._profile.trips]..sort((a, b) => a.startsOn.compareTo(b.startsOn));
+    final totalCost = _profile.trips.fold<int>(0, (sum, trip) => sum + trip.totalCostCents);
+    final totalPaid = _profile.trips.fold<int>(0, (sum, trip) => sum + trip.paidCents);
+    final nextTrip = sortedTrips.where((t) => t.startsOn.isAfter(DateTime.now())).isEmpty
+        ? sortedTrips.lastOrNull
+        : sortedTrips.firstWhere((t) => t.startsOn.isAfter(DateTime.now()));
+    
+    return _pageScaffold('Reisen', 'Alle Ziele und ihre Finanzierung', [
+      if (_profile.trips.isEmpty)
+        _surface(child: EmptyState(
+          icon: Icons.flight_takeoff_rounded,
+          title: 'Noch keine Reise geplant',
+          subtitle: 'Plane dein erstes Ziel und behalte die Kosten im Blick.',
+          actionLabel: 'Reise anlegen',
+          onAction: _openNewTrip,
+          isDark: _isDark,
+        ))
+      else ...[
+        _tripsKPIs(totalCost, totalPaid, nextTrip),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(child: _sectionTitle('Timeline', 'Alle Reisen chronologisch')),
+            FilledButton.icon(
+              onPressed: _openNewTrip,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Reise hinzufügen'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _tripsTimeline(sortedTrips),
+      ],
+    ]);
+  }
 
-  Widget _cashflowPage() => _pageScaffold('Cashflow', 'Einnahmen und regelmäßige Ausgaben', [
-        _cashflowSummary(),
-        const SizedBox(height: 12),
-        _cashflowCard(),
-        const SizedBox(height: 12),
-        _recurringCard(),
-        const SizedBox(height: 12),
-        if (_profile.entries.isEmpty)
-          _surface(child: EmptyState(
-            icon: Icons.swap_vert_rounded,
-            title: 'Noch keine Buchungen',
-            subtitle: 'Füge Ausgaben und Einnahmen hinzu, um deinen Cashflow zu tracken.',
-            actionLabel: 'Buchung hinzufügen',
-            onAction: _showAddCashflow,
-            isDark: _isDark,
-          ))
-        else
-          _surface(child: Column(children: _profile.entries.reversed.map(_entryTile).toList())),
-      ]);
+  Widget _tripsKPIs(int totalCost, int totalPaid, TripPlan? nextTrip) {
+    return Row(children: [
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('REISEN', _mutedColor),
+        const SizedBox(height: 8),
+        Text('${_profile.trips.length}', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
+        const SizedBox(height: 4),
+        Text('geplant', style: TextStyle(fontSize: 12, color: _mutedColor)),
+      ]))),
+      const SizedBox(width: 12),
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('GESAMTKOSTEN', _mutedColor),
+        const SizedBox(height: 8),
+        Text(_money(totalCost), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
+        const SizedBox(height: 4),
+        Text('${_money(totalPaid)} bezahlt', style: TextStyle(fontSize: 12, color: AppColors.green)),
+      ]))),
+      const SizedBox(width: 12),
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('NÄCHSTE REISE', _mutedColor),
+        const SizedBox(height: 8),
+        Text(nextTrip != null ? _shortDate(nextTrip.startsOn) : '–', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.primary)),
+        const SizedBox(height: 4),
+        Text(nextTrip?.name ?? 'Keine', style: TextStyle(fontSize: 12, color: _mutedColor), overflow: TextOverflow.ellipsis),
+      ]))),
+    ]);
+  }
 
-  Widget _cashflowSummary() {
+  Widget _tripsTimeline(List<TripPlan> sortedTrips) {
+    return Column(
+      children: [
+        for (var i = 0; i < sortedTrips.length; i++)
+          _timelineItem(sortedTrips[i], isFirst: i == 0, isLast: i == sortedTrips.length - 1),
+      ],
+    );
+  }
+
+  Widget _timelineItem(TripPlan trip, {required bool isFirst, required bool isLast}) {
     final now = DateTime.now();
+    final isActive = trip.startsOn.isBefore(now) && trip.endsOn.isAfter(now);
+    final isPast = trip.endsOn.isBefore(now);
+    final isFuture = trip.startsOn.isAfter(now);
+    final statusColor = isActive ? AppColors.primary : isPast ? _mutedColor : AppColors.green;
+    final statusLabel = isActive ? 'Aktuell' : isPast ? 'Abgeschlossen' : 'Geplant';
+    
+    final fundingProgress = trip.totalCostCents <= 0 ? 0.0 : (trip.paidCents / trip.totalCostCents).clamp(0.0, 1.0).toDouble();
+    final costProgress = trip.budgetLimitCents <= 0 ? 0.0 : (trip.totalCostCents / trip.budgetLimitCents).clamp(0.0, 1.0).toDouble();
+    final daysUntil = trip.startsOn.difference(now).inDays;
+    
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 40,
+            child: Column(
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _surfaceColor, width: 3),
+                    boxShadow: [BoxShadow(color: statusColor.withValues(alpha: .3), blurRadius: 8, offset: const Offset(0, 2))],
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(width: 2, color: _dividerColor),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _surface(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: .12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(statusLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor)),
+                      ),
+                      const SizedBox(width: 8),
+                      if (isFuture && daysUntil > 0)
+                        Text('in $daysUntil Tagen', style: TextStyle(fontSize: 12, color: _mutedColor)),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        onPressed: () => _openTrip(trip),
+                        tooltip: 'Bearbeiten',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(trip.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textColor)),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    Icon(Icons.location_on_outlined, size: 14, color: _mutedColor),
+                    const SizedBox(width: 4),
+                    Text(trip.destination.isEmpty ? 'Kein Ziel' : trip.destination, style: TextStyle(fontSize: 13, color: _mutedColor)),
+                    const SizedBox(width: 12),
+                    Icon(Icons.calendar_today_rounded, size: 14, color: _mutedColor),
+                    const SizedBox(width: 4),
+                    Text('${_shortDate(trip.startsOn)} – ${_shortDate(trip.endsOn)}', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                    const SizedBox(width: 12),
+                    Icon(Icons.schedule_rounded, size: 14, color: _mutedColor),
+                    const SizedBox(width: 4),
+                    Text('${trip.days} Tage', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                  ]),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        Text('Budget', style: TextStyle(fontSize: 12, color: _mutedColor)),
+                        Text(_money(trip.totalCostCents), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      ]),
+                      const SizedBox(height: 6),
+                      ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(value: costProgress, minHeight: 6, backgroundColor: _dividerColor, color: trip.isOverBudget ? AppColors.red : AppColors.primary)),
+                    ])),
+                    const SizedBox(width: 16),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        Text('Finanziert', style: TextStyle(fontSize: 12, color: _mutedColor)),
+                        Text(_money(trip.paidCents), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.green)),
+                      ]),
+                      const SizedBox(height: 6),
+                      ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(value: fundingProgress, minHeight: 6, backgroundColor: _dividerColor, color: AppColors.green)),
+                    ])),
+                  ]),
+                  if (trip.budgetLimitCents > 0) ...[
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      Icon(trip.isOverBudget ? Icons.warning_amber_rounded : Icons.check_circle_outline_rounded, size: 16, color: trip.isOverBudget ? AppColors.red : AppColors.green),
+                      const SizedBox(width: 6),
+                      Text(
+                        trip.isOverBudget
+                            ? '${_money(-trip.budgetRemainingCents)} über Limit'
+                            : '${_money(trip.budgetRemainingCents)} im Limit',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: trip.isOverBudget ? AppColors.red : AppColors.green),
+                      ),
+                    ]),
+                  ],
+                ],
+              )),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _cashflowPage() {
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month);
     final monthSpending = ProjectionService.categorySpending(_profile, now);
     final totalMonthExpenses = monthSpending.values.fold<int>(0, (sum, v) => sum + v);
     final monthIncome = _profile.monthlyIncomeCents;
-    final surplus = monthIncome - totalMonthExpenses;
-    return _surface(child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    
+    final plannedIncome = _profile.entries
+        .where((e) => !e.isConfirmed && e.kind == TransactionKind.income && e.date.year == currentMonth.year && e.date.month == currentMonth.month)
+        .fold<int>(0, (sum, e) => sum + e.amountCents);
+    final plannedExpenses = _profile.entries
+        .where((e) => !e.isConfirmed && e.kind == TransactionKind.expense && e.date.year == currentMonth.year && e.date.month == currentMonth.month)
+        .fold<int>(0, (sum, e) => sum + e.amountCents);
+    
+    final totalIncome = monthIncome + plannedIncome;
+    final totalExpenses = totalMonthExpenses + plannedExpenses;
+    final surplus = totalIncome - totalExpenses;
+    
+    final totalEntries = _profile.entries.length;
+    final confirmedEntries = _profile.entries.where((e) => e.isConfirmed).length;
+    
+    final sortedEntries = [..._profile.entries]..sort((a, b) => b.date.compareTo(a.date));
+    final groupedEntries = _groupByMonth(sortedEntries);
+    
+    return _pageScaffold('Cashflow', 'Einnahmen und regelmäßige Ausgaben', [
+      _cashflowKPIs(totalIncome, totalExpenses, surplus, totalEntries, confirmedEntries, plannedIncome, plannedExpenses),
+      const SizedBox(height: 24),
+      _recurringCard(),
+      const SizedBox(height: 24),
+      if (_profile.entries.isEmpty)
+        _surface(child: EmptyState(
+          icon: Icons.swap_vert_rounded,
+          title: 'Noch keine Buchungen',
+          subtitle: 'Füge Ausgaben und Einnahmen hinzu, um deinen Cashflow zu tracken.',
+          actionLabel: 'Buchung hinzufügen',
+          onAction: _showAddCashflow,
+          isDark: _isDark,
+        ))
+      else ...[
+        Row(
+          children: [
+            Expanded(child: _sectionTitle('Buchungen', 'Alle Transaktionen chronologisch')),
+            FilledButton.icon(
+              onPressed: _showAddCashflow,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Buchung hinzufügen'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _cashflowTimeline(groupedEntries),
+      ],
+    ]);
+  }
+
+  Widget _cashflowKPIs(int totalIncome, int totalExpenses, int surplus, int totalEntries, int confirmedEntries, int plannedIncome, int plannedExpenses) {
+    return Row(children: [
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('EINNAHMEN', _mutedColor),
+        const SizedBox(height: 8),
+        Text(_money(totalIncome), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.green)),
+        const SizedBox(height: 4),
+        if (plannedIncome > 0)
+          Text('+${_money(plannedIncome)} geplant', style: TextStyle(fontSize: 12, color: AppColors.amber))
+        else
+          Text('diesen Monat', style: TextStyle(fontSize: 12, color: _mutedColor)),
+      ]))),
+      const SizedBox(width: 12),
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('AUSGABEN', _mutedColor),
+        const SizedBox(height: 8),
+        Text(_money(totalExpenses), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.red)),
+        const SizedBox(height: 4),
+        if (plannedExpenses > 0)
+          Text('+${_money(plannedExpenses)} geplant', style: TextStyle(fontSize: 12, color: AppColors.amber))
+        else
+          Text('diesen Monat', style: TextStyle(fontSize: 12, color: _mutedColor)),
+      ]))),
+      const SizedBox(width: 12),
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('ÜBERSCHUSS', _mutedColor),
+        const SizedBox(height: 8),
+        Text(_money(surplus), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: surplus >= 0 ? AppColors.green : AppColors.red)),
+        const SizedBox(height: 4),
+        Text('$confirmedEntries/$totalEntries bestätigt', style: TextStyle(fontSize: 12, color: _mutedColor)),
+      ]))),
+    ]);
+  }
+
+  Map<String, List<CashFlowEntry>> _groupByMonth(List<CashFlowEntry> entries) {
+    final grouped = <String, List<CashFlowEntry>>{};
+    for (final entry in entries) {
+      final key = '${entry.date.year}-${entry.date.month.toString().padLeft(2, '0')}';
+      grouped.putIfAbsent(key, () => []).add(entry);
+    }
+    return grouped;
+  }
+
+  Widget _cashflowTimeline(Map<String, List<CashFlowEntry>> groupedEntries) {
+    final monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    
+    return Column(
       children: [
-        Text('Aktueller Monat', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 14),
-        Row(children: [
-          Expanded(child: _miniStat('Einnahmen', _money(monthIncome), AppColors.green)),
-          Expanded(child: _miniStat('Ausgaben', _money(totalMonthExpenses), AppColors.red)),
-          Expanded(child: _miniStat('Überschuss', _money(surplus), surplus >= 0 ? AppColors.green : AppColors.red)),
-        ]),
-        if (totalMonthExpenses > 0) ...[
-          const SizedBox(height: 16),
-          Text('Top-Ausgaben', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _mutedColor)),
-          const SizedBox(height: 8),
-          ...monthSpending.entries.where((e) => e.value > 0).take(3).map((e) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(children: [
-              Icon(e.key.icon, size: 16, color: e.key.color),
-              const SizedBox(width: 8),
-              Expanded(child: Text(e.key.label, style: const TextStyle(fontSize: 13))),
-              Text(_money(e.value), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-            ]),
+        for (final entry in groupedEntries.entries) ...[
+          _surface(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text('${monthNames[int.parse(entry.key.split('-')[1]) - 1]} ${entry.key.split('-')[0]}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                  ),
+                  const Spacer(),
+                  Text('${entry.value.length} Buchungen', style: TextStyle(fontSize: 12, color: _mutedColor)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...entry.value.map(_entryTile),
+            ],
           )),
+          const SizedBox(height: 12),
         ],
       ],
-    ));
+    );
   }
 
   Widget _recurringCard() => _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [Expanded(child: Text('Regelmäßige Bewegungen', style: Theme.of(context).textTheme.titleMedium)), TextButton.icon(onPressed: () => _showAddRecurring(), icon: const Icon(Icons.add, size: 18), label: const Text('Neu'))]),
-        const SizedBox(height: 8),
-        ..._profile.recurringTransactions.map((item) => Dismissible(
-          key: ValueKey(item.id),
-          direction: DismissDirection.endToStart,
-          background: Container(color: AppColors.red.withValues(alpha: .12), alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete_outline_rounded, color: AppColors.red)),
-          onDismissed: (_) async {
-            setState(() => _profile = _profile.copyWith(recurringTransactions: _profile.recurringTransactions.where((t) => t.id != item.id).toList()));
-            await _persistProfile();
-          },
-          child: Material(color: Colors.transparent, child: ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: Container(width: 36, height: 36, decoration: BoxDecoration(color: item.categoryColor.withValues(alpha: .12), shape: BoxShape.circle), child: Icon(item.categoryIcon, size: 18, color: item.categoryColor)), title: Text(item.title), subtitle: Text('${item.categoryLabel} · ${_frequencyLabel(item.frequency)} · am ${item.dayOfMonth}.'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [Text('${item.kind == TransactionKind.income ? '+' : '-'}${_money(item.amountCents)}', style: const TextStyle(fontWeight: FontWeight.w700)), IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showAddRecurring(item), tooltip: 'Bearbeiten')]))),
-        )),
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Regelmäßige Bewegungen', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text('${_profile.recurringTransactions.length} Positionen', style: TextStyle(fontSize: 12, color: _mutedColor)),
+          ])),
+          TextButton.icon(onPressed: () => _showAddRecurring(), icon: const Icon(Icons.add, size: 18), label: const Text('Neu')),
+        ]),
+        const SizedBox(height: 12),
+        if (_profile.recurringTransactions.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: Text('Keine regelmäßigen Bewegungen', style: TextStyle(color: _mutedColor))),
+          )
+        else
+          ..._profile.recurringTransactions.map((item) => Dismissible(
+            key: ValueKey(item.id),
+            direction: DismissDirection.endToStart,
+            background: Container(color: AppColors.red.withValues(alpha: .12), alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete_outline_rounded, color: AppColors.red)),
+            onDismissed: (_) async {
+              setState(() => _profile = _profile.copyWith(recurringTransactions: _profile.recurringTransactions.where((t) => t.id != item.id).toList()));
+              await _persistProfile();
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _isDark ? AppColors.darkSurface2 : AppColors.lightBg,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(children: [
+                  Container(width: 36, height: 36, decoration: BoxDecoration(color: item.categoryColor.withValues(alpha: .12), shape: BoxShape.circle), child: Icon(item.categoryIcon, size: 18, color: item.categoryColor)),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(item.title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: _textColor)),
+                    const SizedBox(height: 2),
+                    Text('${item.categoryLabel} · ${_frequencyLabel(item.frequency)} · am ${item.dayOfMonth}.', style: TextStyle(fontSize: 12, color: _mutedColor)),
+                  ])),
+                  Text('${item.kind == TransactionKind.income ? '+' : '-'}${_money(item.amountCents)}', style: TextStyle(fontWeight: FontWeight.w700, color: item.kind == TransactionKind.income ? AppColors.green : AppColors.red)),
+                  const SizedBox(width: 4),
+                  IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showAddRecurring(item), tooltip: 'Bearbeiten', padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                ]),
+              ),
+            ),
+          )),
       ]));
 
-  Widget _goalsPage() => _pageScaffold('Sparziele', 'Was möchtest du als Nächstes möglich machen?', [
-        if (_profile.goals.isEmpty)
-          _surface(child: EmptyState(
-            icon: Icons.flag_outlined,
-            title: 'Noch kein Sparziel',
-            subtitle: 'Lege ein Ziel mit Betrag und Deadline an und verfolge deinen Fortschritt.',
-            actionLabel: 'Ziel anlegen',
-            onAction: _showAddGoal,
-            isDark: _isDark,
-          ))
-        else
-          ..._profile.goals.map(_goalTile),
-      ]);
-
-  Widget _purchasesPage() => _pageScaffold('Anschaffungen', 'Plane Dinge, die du dir später leisten möchtest', [
-        _purchaseSummary(),
-        const SizedBox(height: 12),
-        if (_profile.plannedPurchases.isEmpty)
-          _surface(child: EmptyState(
-            icon: Icons.shopping_bag_outlined,
-            title: 'Keine Anschaffungen geplant',
-            subtitle: 'Plane zukünftige Käufe und behalte den Überblick über dein Budget.',
-            actionLabel: 'Anschaffung planen',
-            onAction: _showAddPurchase,
-            isDark: _isDark,
-          ))
-        else
-          ..._profile.plannedPurchases.map(_purchaseTile),
-      ]);
-
-  Widget _purchaseSummary() {
-    final reserved = _profile.reservedPurchaseCents;
-    return _surface(child: Row(children: [const Icon(Icons.event_available_rounded, color: AppColors.primary), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Verplant für Anschaffungen', style: Theme.of(context).textTheme.titleMedium), Text('${_money(reserved)} sind für zukünftige Käufe reserviert.', style: Theme.of(context).textTheme.bodyMedium)]))]));
+  Widget _goalsPage() {
+    final sortedGoals = [..._profile.goals]..sort((a, b) => a.deadline.compareTo(b.deadline));
+    final totalTarget = _profile.goals.fold<int>(0, (sum, g) => sum + g.targetCents);
+    final totalSaved = _profile.goals.fold<int>(0, (sum, g) => sum + g.savedCents);
+    final avgProgress = totalTarget > 0 ? (totalSaved / totalTarget).clamp(0.0, 1.0) : 0.0;
+    final reachedGoals = _profile.goals.where((g) => g.progress >= 1.0).length;
+    
+    return _pageScaffold('Sparziele', 'Was möchtest du als Nächstes möglich machen?', [
+      if (_profile.goals.isEmpty)
+        _surface(child: EmptyState(
+          icon: Icons.flag_outlined,
+          title: 'Noch kein Sparziel',
+          subtitle: 'Lege ein Ziel mit Betrag und Deadline an und verfolge deinen Fortschritt.',
+          actionLabel: 'Ziel anlegen',
+          onAction: _showAddGoal,
+          isDark: _isDark,
+        ))
+      else ...[
+        _goalsKPIs(totalTarget, totalSaved, avgProgress, reachedGoals),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(child: _sectionTitle('Timeline', 'Alle Ziele chronologisch')),
+            FilledButton.icon(
+              onPressed: _showAddGoal,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Ziel hinzufügen'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _goalsTimeline(sortedGoals),
+      ],
+    ]);
   }
 
-  Widget _purchaseTile(PlannedPurchase purchase) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Dismissible(
-      key: ValueKey(purchase.id),
-      direction: DismissDirection.endToStart,
-      background: Container(color: AppColors.red.withValues(alpha: .12), alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete_outline_rounded, color: AppColors.red)),
-      onDismissed: (_) async { setState(() => _profile = _profile.copyWith(plannedPurchases: _profile.plannedPurchases.where((item) => item.id != purchase.id).toList())); await _persistProfile(); },
-      child: _surface(child: Row(children: [
-        Container(width: 42, height: 42, decoration: BoxDecoration(color: purchase.category.color.withValues(alpha: .12), borderRadius: BorderRadius.circular(14)), child: Icon(purchase.category.icon, color: purchase.category.color, size: 20)),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(purchase.title, style: Theme.of(context).textTheme.titleMedium),
-          Text('${purchase.category.label} · geplant für ${_shortDate(purchase.desiredDate)}${purchase.isReserved ? ' · reserviert' : ' · nur geplant'}', style: Theme.of(context).textTheme.bodyMedium),
-        ])),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(_money(purchase.amountCents), style: const TextStyle(fontWeight: FontWeight.w800)),
-          IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showAddPurchase(purchase), tooltip: 'Bearbeiten'),
-        ]),
-      ])),
-    ),
-  );
+  Widget _goalsKPIs(int totalTarget, int totalSaved, double avgProgress, int reachedGoals) {
+    return Row(children: [
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('ZIELE', _mutedColor),
+        const SizedBox(height: 8),
+        Text('${_profile.goals.length}', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
+        const SizedBox(height: 4),
+        Text('$reachedGoals erreicht', style: TextStyle(fontSize: 12, color: AppColors.green)),
+      ]))),
+      const SizedBox(width: 12),
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('GESAMTZIEL', _mutedColor),
+        const SizedBox(height: 8),
+        Text(_money(totalTarget), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
+        const SizedBox(height: 4),
+        Text('${_money(totalSaved)} gespart', style: TextStyle(fontSize: 12, color: AppColors.green)),
+      ]))),
+      const SizedBox(width: 12),
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('FORTSCHRITT', _mutedColor),
+        const SizedBox(height: 8),
+        Text('${(avgProgress * 100).round()}%', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: avgProgress >= 0.8 ? AppColors.green : avgProgress >= 0.5 ? AppColors.amber : AppColors.primary)),
+        const SizedBox(height: 4),
+        Text('Ø Fortschritt', style: TextStyle(fontSize: 12, color: _mutedColor)),
+      ]))),
+    ]);
+  }
+
+  Widget _goalsTimeline(List<SavingsGoal> sortedGoals) {
+    return Column(
+      children: [
+        for (var i = 0; i < sortedGoals.length; i++)
+          _goalTimelineItem(sortedGoals[i], isFirst: i == 0, isLast: i == sortedGoals.length - 1),
+      ],
+    );
+  }
+
+  Widget _goalTimelineItem(SavingsGoal goal, {required bool isFirst, required bool isLast}) {
+    final now = DateTime.now();
+    final isReached = goal.progress >= 1.0;
+    final daysUntil = goal.deadline.difference(now).inDays;
+    final isOverdue = daysUntil < 0 && !isReached;
+    final monthsLeft = (daysUntil / 30).ceil().clamp(0, 120);
+    final neededPerMonth = monthsLeft > 0 ? (goal.remainingCents / monthsLeft).ceil() : goal.remainingCents;
+    final onTrack = neededPerMonth <= goal.monthlyAllocationCents;
+    
+    final statusColor = isReached ? AppColors.green : isOverdue ? AppColors.red : onTrack ? AppColors.primary : AppColors.amber;
+    final statusLabel = isReached ? 'Erreicht' : isOverdue ? 'Überfällig' : onTrack ? 'Im Plan' : 'Nachjustieren';
+    
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 40,
+            child: Column(
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _surfaceColor, width: 3),
+                    boxShadow: [BoxShadow(color: statusColor.withValues(alpha: .3), blurRadius: 8, offset: const Offset(0, 2))],
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(width: 2, color: _dividerColor),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Dismissible(
+                key: ValueKey(goal.id),
+                direction: DismissDirection.endToStart,
+                background: Container(decoration: BoxDecoration(color: AppColors.red.withValues(alpha: .12), borderRadius: BorderRadius.circular(20)), alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete_outline_rounded, color: AppColors.red)),
+                onDismissed: (_) async {
+                  setState(() => _profile = _profile.copyWith(goals: _profile.goals.where((g) => g.id != goal.id).toList()));
+                  await _persistProfile();
+                },
+                child: _surface(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: .12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(statusLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor)),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.flag_rounded, size: 14, color: _mutedColor),
+                        const SizedBox(width: 4),
+                        Text(_shortDate(goal.deadline), style: TextStyle(fontSize: 12, color: _mutedColor)),
+                        if (!isReached && daysUntil > 0) ...[
+                          const SizedBox(width: 8),
+                          Text('in $daysUntil Tagen', style: TextStyle(fontSize: 12, color: _mutedColor)),
+                        ],
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          onPressed: () => _showAddGoal(goal),
+                          tooltip: 'Bearbeiten',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(goal.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textColor)),
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      Text('Ziel: ${_money(goal.targetCents)}', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                      const SizedBox(width: 16),
+                      Text('${_money(goal.savedCents)} gespart', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.green)),
+                      const SizedBox(width: 16),
+                      Text('${_money(goal.monthlyAllocationCents)}/Monat', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                    ]),
+                    const SizedBox(height: 16),
+                    ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: goal.progress, minHeight: 10, color: statusColor, backgroundColor: _dividerColor)),
+                    const SizedBox(height: 8),
+                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                      Text('${(goal.progress * 100).round()}%', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: statusColor)),
+                      if (!isReached && !onTrack)
+                        Text('Bräuchte ${_money(neededPerMonth)}/Monat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.amber)),
+                      if (isReached)
+                        Text('Geschafft!', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.green)),
+                    ]),
+                  ],
+                )),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _purchasesPage() {
+    final sortedPurchases = [..._profile.plannedPurchases]..sort((a, b) => a.desiredDate.compareTo(b.desiredDate));
+    final totalCost = _profile.plannedPurchases.fold<int>(0, (sum, p) => sum + p.amountCents);
+    final reservedCost = _profile.plannedPurchases.where((p) => p.isReserved).fold<int>(0, (sum, p) => sum + p.amountCents);
+    final purchasedCount = _profile.plannedPurchases.where((p) => p.isPurchased).length;
+    
+    return _pageScaffold('Anschaffungen', 'Plane Dinge, die du dir später leisten möchtest', [
+      if (_profile.plannedPurchases.isEmpty)
+        _surface(child: EmptyState(
+          icon: Icons.shopping_bag_outlined,
+          title: 'Keine Anschaffungen geplant',
+          subtitle: 'Plane zukünftige Käufe und behalte den Überblick über dein Budget.',
+          actionLabel: 'Anschaffung planen',
+          onAction: _showAddPurchase,
+          isDark: _isDark,
+        ))
+      else ...[
+        _purchasesKPIs(totalCost, reservedCost, purchasedCount),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(child: _sectionTitle('Timeline', 'Alle Anschaffungen chronologisch')),
+            FilledButton.icon(
+              onPressed: _showAddPurchase,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Anschaffung planen'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _purchasesTimeline(sortedPurchases),
+      ],
+    ]);
+  }
+
+  Widget _purchasesKPIs(int totalCost, int reservedCost, int purchasedCount) {
+    return Row(children: [
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('ANSCHAFFUNGEN', _mutedColor),
+        const SizedBox(height: 8),
+        Text('${_profile.plannedPurchases.length}', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
+        const SizedBox(height: 4),
+        Text('$purchasedCount gekauft', style: TextStyle(fontSize: 12, color: AppColors.green)),
+      ]))),
+      const SizedBox(width: 12),
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('GESAMTKOSTEN', _mutedColor),
+        const SizedBox(height: 8),
+        Text(_money(totalCost), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
+        const SizedBox(height: 4),
+        Text('${_money(reservedCost)} reserviert', style: TextStyle(fontSize: 12, color: AppColors.green)),
+      ]))),
+      const SizedBox(width: 12),
+      Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('RESERVIERT', _mutedColor),
+        const SizedBox(height: 8),
+        Text(totalCost > 0 ? '${(reservedCost / totalCost * 100).round()}%' : '0%', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: reservedCost > 0 ? AppColors.green : _mutedColor)),
+        const SizedBox(height: 4),
+        Text('des Gesamtbetrags', style: TextStyle(fontSize: 12, color: _mutedColor)),
+      ]))),
+    ]);
+  }
+
+  Widget _purchasesTimeline(List<PlannedPurchase> sortedPurchases) {
+    return Column(
+      children: [
+        for (var i = 0; i < sortedPurchases.length; i++)
+          _purchaseTimelineItem(sortedPurchases[i], isFirst: i == 0, isLast: i == sortedPurchases.length - 1),
+      ],
+    );
+  }
+
+  Widget _purchaseTimelineItem(PlannedPurchase purchase, {required bool isFirst, required bool isLast}) {
+    final now = DateTime.now();
+    final daysUntil = purchase.desiredDate.difference(now).inDays;
+    final isPast = daysUntil < 0;
+    final isPurchased = purchase.isPurchased;
+    final isReserved = purchase.isReserved;
+    
+    final statusColor = isPurchased ? AppColors.green : isPast ? AppColors.red : isReserved ? AppColors.primary : AppColors.amber;
+    final statusLabel = isPurchased ? 'Gekauft' : isPast ? 'Überfällig' : isReserved ? 'Reserviert' : 'Geplant';
+    
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 40,
+            child: Column(
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _surfaceColor, width: 3),
+                    boxShadow: [BoxShadow(color: statusColor.withValues(alpha: .3), blurRadius: 8, offset: const Offset(0, 2))],
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(width: 2, color: _dividerColor),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Dismissible(
+                key: ValueKey(purchase.id),
+                direction: DismissDirection.endToStart,
+                background: Container(decoration: BoxDecoration(color: AppColors.red.withValues(alpha: .12), borderRadius: BorderRadius.circular(20)), alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete_outline_rounded, color: AppColors.red)),
+                onDismissed: (_) async {
+                  setState(() => _profile = _profile.copyWith(plannedPurchases: _profile.plannedPurchases.where((p) => p.id != purchase.id).toList()));
+                  await _persistProfile();
+                },
+                child: _surface(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: .12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(statusLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor)),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: purchase.category.color.withValues(alpha: .12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(purchase.category.icon, size: 12, color: purchase.category.color),
+                            const SizedBox(width: 4),
+                            Text(purchase.category.label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: purchase.category.color)),
+                          ]),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          onPressed: () => _showAddPurchase(purchase),
+                          tooltip: 'Bearbeiten',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(purchase.title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textColor)),
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      Icon(Icons.calendar_today_rounded, size: 14, color: _mutedColor),
+                      const SizedBox(width: 4),
+                      Text(_shortDate(purchase.desiredDate), style: TextStyle(fontSize: 13, color: _mutedColor)),
+                      if (!isPurchased && daysUntil > 0) ...[
+                        const SizedBox(width: 8),
+                        Text('in $daysUntil Tagen', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                      ],
+                      const Spacer(),
+                      Text(_money(purchase.amountCents), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textColor)),
+                    ]),
+                  ],
+                )),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _entryTile(CashFlowEntry entry) => Dismissible(
         key: ValueKey(entry.id),
@@ -647,42 +1234,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
           setState(() => _profile = _profile.copyWith(entries: _profile.entries.where((item) => item.id != entry.id).toList(), currentBalanceCents: entry.isConfirmed ? _profile.currentBalanceCents - entry.signedAmountCents : null));
           await _persistProfile();
         },
-        child: Material(color: Colors.transparent, child: ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(color: entry.categoryColor.withValues(alpha: .12), shape: BoxShape.circle),
-            child: Icon(entry.categoryIcon, color: entry.categoryColor, size: 18),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _isDark ? AppColors.darkSurface2 : AppColors.lightBg,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(color: entry.categoryColor.withValues(alpha: .12), shape: BoxShape.circle),
+                child: Icon(entry.categoryIcon, color: entry.categoryColor, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(entry.title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: _textColor)),
+                const SizedBox(height: 2),
+                Text('${entry.categoryLabel} · ${_shortDate(entry.date)}', style: TextStyle(fontSize: 12, color: _mutedColor)),
+              ])),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: entry.isConfirmed ? AppColors.green.withValues(alpha: .12) : AppColors.amber.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(entry.isConfirmed ? 'Bestätigt' : 'Geplant', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: entry.isConfirmed ? AppColors.green : AppColors.amber)),
+              ),
+              const SizedBox(width: 8),
+              Text('${entry.kind == TransactionKind.income ? '+' : '-'}${_money(entry.amountCents)}', style: TextStyle(fontWeight: FontWeight.w700, color: entry.kind == TransactionKind.income ? AppColors.green : AppColors.red)),
+            ]),
           ),
-          title: Text(entry.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          subtitle: Text('${entry.categoryLabel} · ${_shortDate(entry.date)}${entry.isConfirmed ? ' · bestätigt' : ' · geplant'}'),
-          trailing: Text('${entry.kind == TransactionKind.income ? '+' : '-'}${_money(entry.amountCents)}', style: TextStyle(fontWeight: FontWeight.w700, color: entry.kind == TransactionKind.income ? const Color(0xFF20966A) : const Color(0xFFD94E5A))),
-        )),
+        ),
       );
 
-  Widget _goalTile(SavingsGoal goal) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Dismissible(
-      key: ValueKey(goal.id),
-      direction: DismissDirection.endToStart,
-      background: Container(color: AppColors.red.withValues(alpha: .12), alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete_outline_rounded, color: AppColors.red)),
-      onDismissed: (_) async {
-        setState(() => _profile = _profile.copyWith(goals: _profile.goals.where((g) => g.id != goal.id).toList()));
-        await _persistProfile();
-      },
-      child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Text(goal.name, style: Theme.of(context).textTheme.titleMedium)),
-          Text(_money(goal.targetCents), style: const TextStyle(fontWeight: FontWeight.w700)),
-          IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showAddGoal(goal), tooltip: 'Bearbeiten'),
-        ]),
-        const SizedBox(height: 14),
-        ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: goal.progress, minHeight: 8, color: AppColors.primary, backgroundColor: _dividerColor)),
-        const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('${_money(goal.savedCents)} gespart'), Text('${(goal.progress * 100).round()} % · ${_money(goal.monthlyAllocationCents)}/Monat')])])),
-    ),
-  );
   Widget _pageScaffold(String title, String subtitle, List<Widget> children) {
     return Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 850), child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 28, 20, 100), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700, letterSpacing: -1.4, color: _textColor)), const SizedBox(height: 4), Text(subtitle, style: TextStyle(color: _secondaryColor)), const SizedBox(height: 26), ...children]))));
   }
@@ -717,26 +1304,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [BoxShadow(color: _shadowColor, blurRadius: 12, offset: const Offset(0, 4))],
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-          initiallyExpanded: initiallyExpanded,
-          leading: Icon(icon, color: AppColors.primary, size: 20),
-          title: Text(title, style: Theme.of(context).textTheme.titleMedium),
-          shape: const Border(),
-          children: [child],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+            childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+            initiallyExpanded: initiallyExpanded,
+            leading: Icon(icon, color: AppColors.primary, size: 20),
+            title: Text(title, style: Theme.of(context).textTheme.titleMedium),
+            shape: const Border(),
+            children: [child],
+          ),
         ),
       ),
     );
   }
 
-  Widget _sectionTitle(String title, String subtitle) => Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.headlineSmall), Text(subtitle, style: Theme.of(context).textTheme.bodyMedium)])), Icon(Icons.more_horiz_rounded, color: _mutedColor)]);
+  Widget _sectionTitle(String title, String subtitle) => Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.headlineSmall), Text(subtitle, style: Theme.of(context).textTheme.bodyMedium)]))]);
 
   Widget _cardLabel(String text, Color color) => Text(text, style: TextStyle(fontSize: 11, letterSpacing: 1.1, fontWeight: FontWeight.w800, color: color));
-
-  Widget _statusPill(String label, bool positive) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: (positive ? AppColors.green : AppColors.amber).withValues(alpha: .11), borderRadius: BorderRadius.circular(20)), child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: positive ? AppColors.green : AppColors.amber)));
 
   void _selectTab(int index) => setState(() => _selectedIndex = index);
 
@@ -901,19 +1489,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Daten erfolgreich importiert!')));
   }
 
-  Future<void> _showAddIncome() async {
-    final controller = TextEditingController();
-    final amount = await showModalBottomSheet<int>(context: context, isScrollControlled: true, builder: (context) => Padding(padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.viewInsetsOf(context).bottom + 24), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Monatliches Plus', style: Theme.of(context).textTheme.headlineSmall), const SizedBox(height: 6), const Text('Wie viel kommt regelmäßig dazu?'), const SizedBox(height: 18), TextField(controller: controller, autofocus: true, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Betrag')), const SizedBox(height: 16), SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Navigator.pop(context, ((double.tryParse(controller.text.replaceAll(',', '.')) ?? 0) * 100).round()), child: const Text('Übernehmen')))])));
-    if (amount == null || amount <= 0) return;
-    setState(() {
-      final incomeTransactions = _profile.recurringTransactions.where((item) => item.kind == TransactionKind.income).toList();
-      final existing = incomeTransactions.isEmpty ? null : incomeTransactions.first;
-      final income = RecurringTransaction(id: existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(), title: existing?.title ?? 'Monatliches Plus', amountCents: amount, kind: TransactionKind.income, incomeCategory: existing?.incomeCategory ?? IncomeCategory.gehalt, startsOn: existing?.startsOn ?? DateTime.now());
-      final otherTransactions = _profile.recurringTransactions.where((item) => item.id != existing?.id).toList();
-      _profile = _profile.copyWith(recurringTransactions: [income, ...otherTransactions]);
-    });
-    await _persistProfile();
-  }
 
   Future<void> _showAddCashflow() async {
     final titleController = TextEditingController();
@@ -922,6 +1497,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     var confirmed = true;
     ExpenseCategory expCat = ExpenseCategory.sonstiges;
     IncomeCategory incCat = IncomeCategory.sonstiges;
+    var selectedDate = DateTime.now();
     final entry = await showModalBottomSheet<CashFlowEntry>(
       context: context,
       isScrollControlled: true,
@@ -934,6 +1510,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
             TextField(controller: titleController, autofocus: true, decoration: const InputDecoration(labelText: 'Titel', hintText: 'z. B. Zugticket', border: OutlineInputBorder())),
             const SizedBox(height: 12),
             TextField(controller: amountController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Betrag', border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: selectedDate,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
+                if (picked != null) setSheetState(() => selectedDate = picked);
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: InputDecorator(
+                decoration: const InputDecoration(labelText: 'Datum', border: OutlineInputBorder(), suffixIcon: Icon(Icons.calendar_today_rounded, size: 20)),
+                child: Text(_shortDate(selectedDate)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => setSheetState(() => selectedDate = DateTime.now()),
+                  icon: const Icon(Icons.today_rounded, size: 18),
+                  label: const Text('Heute'),
+                ),
+              ),
+            ]),
             const SizedBox(height: 12),
             DropdownButtonFormField<TransactionKind>(initialValue: kind, decoration: const InputDecoration(labelText: 'Art', border: OutlineInputBorder()), items: const [DropdownMenuItem(value: TransactionKind.expense, child: Text('Ausgabe')), DropdownMenuItem(value: TransactionKind.income, child: Text('Einnahme'))], onChanged: (value) => setSheetState(() => kind = value ?? TransactionKind.expense)),
             const SizedBox(height: 12),
@@ -959,7 +1562,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             CheckboxListTile(contentPadding: EdgeInsets.zero, value: confirmed, title: const Text('Bereits bestätigt / bezahlt'), onChanged: (value) => setSheetState(() => confirmed = value ?? true)),
             const SizedBox(height: 8),
-            SizedBox(width: double.infinity, child: FilledButton(onPressed: () { final amount = _parseAmount(amountController.text); if (titleController.text.trim().isEmpty || amount <= 0) return; Navigator.pop(sheetContext, CashFlowEntry(id: DateTime.now().microsecondsSinceEpoch.toString(), title: titleController.text.trim(), amountCents: amount, date: DateTime.now(), kind: kind, expenseCategory: kind == TransactionKind.expense ? expCat : null, incomeCategory: kind == TransactionKind.income ? incCat : null, isConfirmed: confirmed)); }, child: const Text('Buchung speichern'))),
+            SizedBox(width: double.infinity, child: FilledButton(onPressed: () { final amount = _parseAmount(amountController.text); if (titleController.text.trim().isEmpty || amount <= 0) return; Navigator.pop(sheetContext, CashFlowEntry(id: DateTime.now().microsecondsSinceEpoch.toString(), title: titleController.text.trim(), amountCents: amount, date: selectedDate, kind: kind, expenseCategory: kind == TransactionKind.expense ? expCat : null, incomeCategory: kind == TransactionKind.income ? incCat : null, isConfirmed: confirmed)); }, child: const Text('Buchung speichern'))),
           ]),
         ),
       ),

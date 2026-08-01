@@ -19,9 +19,58 @@ class TripCostBreakdown extends StatelessWidget {
     if (total <= 0) return const SizedBox.shrink();
 
     final items = _costItems();
+    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      ...items.map((item) => _costBar(item, total)),
+      _stackedBar(items, total),
+      const SizedBox(height: 10),
+      Wrap(
+        spacing: 12,
+        runSpacing: 6,
+        children: items.map((item) => _chip(item, total, mutedColor)).toList(),
+      ),
     ]);
+  }
+
+  Widget _stackedBar(List<_CostItem> items, int total) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        height: 10,
+        child: Row(
+          children: items.map((item) {
+            final fraction = (item.cents / total).clamp(0.0, 1.0).toDouble();
+            return Expanded(
+              flex: (fraction * 1000).round().clamp(1, 1000),
+              child: Container(color: item.color),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _chip(_CostItem item, int total, Color mutedColor) {
+    final percent = (item.cents / total * 100).round();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: item.color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(item.label, style: TextStyle(fontSize: 12, color: mutedColor)),
+        const SizedBox(width: 4),
+        Text(_money(item.cents), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: item.color)),
+        const SizedBox(width: 2),
+        Text('($percent%)', style: TextStyle(fontSize: 11, color: mutedColor)),
+      ],
+    );
   }
 
   List<_CostItem> _costItems() {
@@ -40,7 +89,7 @@ class TripCostBreakdown extends StatelessWidget {
       items.add(_CostItem('Sonstiges', trip.segmentOtherCents, const Color(0xFF00B8D9)));
     }
     if (trip.expenseCents > 0) {
-      items.add(_CostItem('Expenses', trip.expenseCents, AppColors.pink));
+      items.add(_CostItem('Kosten', trip.expenseCents, AppColors.pink));
     }
     if (trip.fixedCostsCents > 0) {
       items.add(_CostItem('Fixkosten', trip.fixedCostsCents, const Color(0xFF7B61FF)));
@@ -49,37 +98,6 @@ class TripCostBreakdown extends StatelessWidget {
       items.add(_CostItem('Puffer', trip.bufferCents, isDark ? AppColors.darkMuted : AppColors.lightMuted));
     }
     return items;
-  }
-
-  Widget _costBar(_CostItem item, int total) {
-    final fraction = total > 0 ? item.cents / total : 0.0;
-    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(children: [
-        SizedBox(width: 72, child: Text(item.label, style: TextStyle(fontSize: 12, color: mutedColor))),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: fraction.clamp(0.0, 1.0).toDouble(),
-              minHeight: 6,
-              backgroundColor: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-              color: item.color,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 60,
-          child: Text(
-            _money(item.cents),
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: item.color),
-            textAlign: TextAlign.right,
-          ),
-        ),
-      ]),
-    );
   }
 
   String _money(int cents) => '${(cents / 100).toStringAsFixed(0)} €';
