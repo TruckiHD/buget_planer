@@ -103,15 +103,42 @@ class TripTransportSection extends StatelessWidget {
             launchUrl(Uri.parse(BookingService.getGoogleMapsLink(t.fromLocation, t.toLocation)));
           }),
           const SizedBox(width: 6),
-          _bookingChip(context, 'DB', Icons.train_rounded, AppColors.primary, () {
-            final links = BookingService.getLinks(transport: t);
-            launchUrl(Uri.parse(links.dbUrl!));
-          }),
-          const SizedBox(width: 6),
-          _bookingChip(context, 'Omio', Icons.directions_bus_rounded, AppColors.amber, () {
-            final links = BookingService.getLinks(transport: t);
-            launchUrl(Uri.parse(links.omioUrl!));
-          }),
+          if (t.mode == TransportMode.auto) ...[
+            _bookingChip(context, 'Sixt', Icons.directions_car_rounded, AppColors.primary, () {
+              final links = BookingService.getLinks(transport: t);
+              launchUrl(Uri.parse(links.sixtUrl!));
+            }),
+            const SizedBox(width: 6),
+            _bookingChip(context, 'Hertz', Icons.directions_car_rounded, AppColors.amber, () {
+              final links = BookingService.getLinks(transport: t);
+              launchUrl(Uri.parse(links.hertzUrl!));
+            }),
+            const SizedBox(width: 6),
+            _bookingChip(context, 'Europcar', Icons.directions_car_rounded, AppColors.green, () {
+              final links = BookingService.getLinks(transport: t);
+              launchUrl(Uri.parse(links.europcarUrl!));
+            }),
+          ] else if (t.mode == TransportMode.flug) ...[
+            _bookingChip(context, 'Skyscanner', Icons.flight_rounded, AppColors.primary, () {
+              final links = BookingService.getLinks(transport: t);
+              launchUrl(Uri.parse(links.skannerUrl!));
+            }),
+            const SizedBox(width: 6),
+            _bookingChip(context, 'Omio', Icons.directions_bus_rounded, AppColors.amber, () {
+              final links = BookingService.getLinks(transport: t);
+              launchUrl(Uri.parse(links.omioUrl!));
+            }),
+          ] else ...[
+            _bookingChip(context, 'DB', Icons.train_rounded, AppColors.primary, () {
+              final links = BookingService.getLinks(transport: t);
+              launchUrl(Uri.parse(links.dbUrl!));
+            }),
+            const SizedBox(width: 6),
+            _bookingChip(context, 'Omio', Icons.directions_bus_rounded, AppColors.amber, () {
+              final links = BookingService.getLinks(transport: t);
+              launchUrl(Uri.parse(links.omioUrl!));
+            }),
+          ],
         ]),
       ]),
     );

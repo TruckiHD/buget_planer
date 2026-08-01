@@ -248,7 +248,7 @@ class _FullscreenMap extends StatelessWidget {
       return Marker(
         point: LatLng(s.latitude!, s.longitude!),
         width: 60,
-        height: 60,
+        height: 75,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
             width: 38,

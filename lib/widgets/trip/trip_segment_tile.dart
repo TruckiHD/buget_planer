@@ -21,7 +21,7 @@ class TripSegmentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
-    final totalSegmentCost = segment.accommodationCostCents + segment.foodCostCents + segment.transportCostCents + segment.otherCostCents;
+    final totalSegmentCost = segment.accommodationCostCents + segment.foodCostCents + segment.transportCostCents + segment.otherCostCents + segment.baseTransportCostCents;
 
     return Dismissible(
       key: ValueKey(segment.id),
@@ -49,11 +49,21 @@ class TripSegmentTile extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: .11),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.hotel_outlined, color: AppColors.primary, size: 20),
+              child: Icon(segment.isBaseLocation ? Icons.home_rounded : Icons.hotel_outlined, color: AppColors.primary, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(segment.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              Row(children: [
+                Text(segment.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                if (segment.isBaseLocation) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(color: AppColors.green.withValues(alpha: .12), borderRadius: BorderRadius.circular(6)),
+                    child: const Text('Basis', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.green)),
+                  ),
+                ],
+              ]),
               const SizedBox(height: 2),
               Row(children: [
                 Icon(Icons.location_on_outlined, size: 13, color: mutedColor),
@@ -91,6 +101,7 @@ class TripSegmentTile extends StatelessWidget {
             _miniStat('Hotel', segment.accommodationCostCents, AppColors.primary),
             _miniStat('Essen', segment.foodCostCents, AppColors.green),
             if (segment.transportCostCents > 0) _miniStat('Transport', segment.transportCostCents, AppColors.amber),
+            if (segment.baseTransportCostCents > 0) _miniStat('Ausflüge', segment.baseTransportCostCents, const Color(0xFF00B8D9)),
             if (segment.otherCostCents > 0) _miniStat('Sonstiges', segment.otherCostCents, const Color(0xFF00B8D9)),
             const Spacer(),
             Text(_money(totalSegmentCost), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
@@ -106,6 +117,8 @@ class TripSegmentTile extends StatelessWidget {
                   Expanded(flex: segment.foodCostCents, child: Container(height: 4, color: AppColors.green)),
                 if (segment.transportCostCents > 0)
                   Expanded(flex: segment.transportCostCents, child: Container(height: 4, color: AppColors.amber)),
+                if (segment.baseTransportCostCents > 0)
+                  Expanded(flex: segment.baseTransportCostCents, child: Container(height: 4, color: const Color(0xFF00B8D9))),
                 if (segment.otherCostCents > 0)
                   Expanded(flex: segment.otherCostCents, child: Container(height: 4, color: const Color(0xFF00B8D9))),
               ]),

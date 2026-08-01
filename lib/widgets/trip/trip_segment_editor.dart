@@ -37,9 +37,11 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
   late TextEditingController _foodController;
   late TextEditingController _transportController;
   late TextEditingController _otherController;
+  late TextEditingController _baseTransportController;
   late DateTime _startsOn;
   late DateTime _endsOn;
   bool _paid = false;
+  bool _isBaseLocation = false;
   double? _lat;
   double? _lng;
 
@@ -67,19 +69,21 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
     _locationController = TextEditingController(text: _existing?.location ?? '');
     _hotelController = TextEditingController(text: _existing?.accommodationName ?? '');
     _hotelCostController = TextEditingController(text: _existing == null ? '' : _euros(_existing!.accommodationCostCents));
-    _foodController = TextEditingController(text: _existing == null ? '' : _euros(_existing!.dailyFoodBudgetCents));
+    _foodController = TextEditingController(text: _existing == null ? (widget.trip.dailyBudgetCents > 0 ? _euros(widget.trip.dailyBudgetCents) : '') : _euros(_existing!.dailyFoodBudgetCents));
     _transportController = TextEditingController(text: _existing == null ? '0' : _euros(_existing!.transportCostCents));
     _otherController = TextEditingController(text: _existing == null ? '0' : _euros(_existing!.otherCostCents));
+    _baseTransportController = TextEditingController(text: _existing == null ? '' : _euros(_existing!.baseTransportCostCents));
     _startsOn = _existing?.startsOn ?? _earliestStart;
     _endsOn = _existing?.endsOn ?? _earliestStart.add(const Duration(days: 2));
     _paid = _existing?.accommodationPaid ?? false;
+    _isBaseLocation = _existing?.isBaseLocation ?? false;
     _lat = _existing?.latitude;
     _lng = _existing?.longitude;
   }
 
   @override
   void dispose() {
-    for (final c in [_nameController, _locationController, _hotelController, _hotelCostController, _foodController, _transportController, _otherController]) {
+    for (final c in [_nameController, _locationController, _hotelController, _hotelCostController, _foodController, _transportController, _otherController, _baseTransportController]) {
       c.dispose();
     }
     super.dispose();
@@ -108,6 +112,9 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
           if (foodSuggestion != null) ...[
             const SizedBox(height: 6),
             _foodSuggestionChip(foodSuggestion),
+          ] else ...[
+            const SizedBox(height: 6),
+            _countryPickerChip(),
           ],
           const SizedBox(height: 10),
           _dateRangeButton(_startsOn, _endsOn, _pickDateRange),
@@ -128,11 +135,7 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
             Expanded(child: TextField(controller: _foodController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Essen / Tag'))),
           ]),
           const SizedBox(height: 8),
-          Wrap(spacing: 6, children: [
-            ActionChip(label: const Text('20€ sparsam'), onPressed: () => setState(() => _foodController.text = '20')),
-            ActionChip(label: const Text('35€ normal'), onPressed: () => setState(() => _foodController.text = '35')),
-            ActionChip(label: const Text('55€ komfortabel'), onPressed: () => setState(() => _foodController.text = '55')),
-          ]),
+          Wrap(spacing: 6, children: _buildFoodChips(foodSuggestion)),
           const SizedBox(height: 10),
           Material(color: Colors.transparent, child: SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -140,6 +143,21 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
             title: const Text('Hotel bereits bezahlt'),
             onChanged: (v) => setState(() => _paid = v),
           )),
+          const SizedBox(height: 16),
+          _sectionHeader(Icons.hotel_outlined, 'Basis-Option'),
+          const SizedBox(height: 10),
+          Material(color: Colors.transparent, child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _isBaseLocation,
+            title: const Text('Hauptstandort (Basis)'),
+            subtitle: const Text('Für längeren Aufenthalt mit Ausflügen'),
+            onChanged: (v) => setState(() => _isBaseLocation = v),
+          )),
+          if (_isBaseLocation) ...[
+            const SizedBox(height: 10),
+            TextField(controller: _baseTransportController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Transportkosten für Ausflüge')),
+          ],
+          const SizedBox(height: 18),
           Row(children: [
             Expanded(child: TextField(controller: _transportController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Transport'))),
             const SizedBox(width: 10),
@@ -161,18 +179,20 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
   }
 
   Widget _foodSuggestionChip(FoodPriceData data) {
+    final color = data.isCountryLevel ? const Color(0xFFE5A000) : AppColors.green;
+    final label = data.isCountryLevel ? '${data.country} (Durchschnitt)' : data.city;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.green.withValues(alpha: .08),
+        color: color.withValues(alpha: .08),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(children: [
-        const Icon(Icons.lightbulb_outline_rounded, size: 16, color: AppColors.green),
+        Icon(data.isCountryLevel ? Icons.public_rounded : Icons.lightbulb_outline_rounded, size: 16, color: color),
         const SizedBox(width: 8),
         Expanded(child: Text(
-          '${data.city}: ~${data.mealInexpensive.toStringAsFixed(0)}€ sparsam, ~${data.mealMidRange.toStringAsFixed(0)}€ mittel',
-          style: const TextStyle(fontSize: 12, color: AppColors.green, fontWeight: FontWeight.w600),
+          '$label: ~${data.mealInexpensive.toStringAsFixed(0)}€ sparsam, ~${data.mealMidRange.toStringAsFixed(0)}€ mittel',
+          style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600),
         )),
         TextButton(
           onPressed: () => setState(() => _foodController.text = ((data.mealInexpensive + data.mealMidRange) / 2).toStringAsFixed(2)),
@@ -181,6 +201,44 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
         ),
       ]),
     );
+  }
+
+  Widget _countryPickerChip() {
+    return InkWell(
+      onTap: _showCountryPicker,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: .06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.primary.withValues(alpha: .2)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.search_rounded, size: 16, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(child: Text(
+            'Land für Essenskosten wählen...',
+            style: TextStyle(fontSize: 12, color: AppColors.primary.withValues(alpha: .7), fontWeight: FontWeight.w500),
+          )),
+          const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppColors.primary),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _showCountryPicker() async {
+    final countries = FoodPriceService.availableCountries;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _CountryPickerSheet(countries: countries),
+    );
+    if (selected == null) return;
+    final data = FoodPriceService.lookup(selected);
+    if (data == null) return;
+    setState(() => _foodController.text = ((data.mealInexpensive + data.mealMidRange) / 2).toStringAsFixed(2));
   }
 
   Widget _dateRangeButton(DateTime start, DateTime end, VoidCallback onPressed) {
@@ -241,10 +299,108 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
       accommodationPaid: _paid,
       latitude: _lat != null && _lat! > 0 ? _lat : null,
       longitude: _lng != null && _lng! > 0 ? _lng : null,
+      isBaseLocation: _isBaseLocation,
+      baseTransportCostCents: _isBaseLocation ? _parseAmount(_baseTransportController.text) : 0,
     );
     Navigator.pop(context, segment);
   }
 
   String _euros(int cents) => (cents / 100).toStringAsFixed(2);
   int _parseAmount(String value) => ((double.tryParse(value.replaceAll(',', '.')) ?? 0) * 100).round();
+
+  Widget _sectionHeader(IconData icon, String label) {
+    return Row(children: [
+      Icon(icon, size: 18, color: AppColors.primary),
+      const SizedBox(width: 8),
+      Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkMuted : AppColors.lightMuted)),
+    ]);
+  }
+
+  List<Widget> _buildFoodChips(FoodPriceData? data) {
+    if (data != null) {
+      final budget = data.budgetCents / 100;
+      final suggested = data.suggestedBudgetCents / 100;
+      final comfortable = data.comfortableCents / 100;
+      return [
+        ActionChip(label: Text('${budget.toStringAsFixed(0)}€ sparsam'), onPressed: () => setState(() => _foodController.text = budget.toStringAsFixed(2))),
+        ActionChip(label: Text('${suggested.toStringAsFixed(0)}€ normal'), onPressed: () => setState(() => _foodController.text = suggested.toStringAsFixed(2))),
+        ActionChip(label: Text('${comfortable.toStringAsFixed(0)}€ komfortabel'), onPressed: () => setState(() => _foodController.text = comfortable.toStringAsFixed(2))),
+      ];
+    }
+    return [
+      ActionChip(label: const Text('20€ sparsam'), onPressed: () => setState(() => _foodController.text = '20')),
+      ActionChip(label: const Text('35€ normal'), onPressed: () => setState(() => _foodController.text = '35')),
+      ActionChip(label: const Text('55€ komfortabel'), onPressed: () => setState(() => _foodController.text = '55')),
+    ];
+  }
+}
+
+class _CountryPickerSheet extends StatefulWidget {
+  final List<String> countries;
+  const _CountryPickerSheet({required this.countries});
+
+  @override
+  State<_CountryPickerSheet> createState() => _CountryPickerSheetState();
+}
+
+class _CountryPickerSheetState extends State<_CountryPickerSheet> {
+  String _query = '';
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final filtered = _query.isEmpty
+        ? widget.countries
+        : widget.countries.where((c) => c.toLowerCase().contains(_query.toLowerCase())).toList();
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 12, 20, bottom + 20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.lightDivider, borderRadius: BorderRadius.circular(2)))),
+        const SizedBox(height: 14),
+        const Text('Land auswählen', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _searchController,
+          decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Suchen...', isDense: true),
+          onChanged: (v) => setState(() => _query = v),
+        ),
+        const SizedBox(height: 8),
+        ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.45),
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: filtered.length,
+            itemBuilder: (ctx, i) {
+              final country = filtered[i];
+              final data = FoodPriceService.lookup(country);
+              return ListTile(
+                dense: true,
+                title: Text(country),
+                subtitle: data != null ? Text('~${data.mealInexpensive.toStringAsFixed(0)}–${data.mealMidRange.toStringAsFixed(0)}€ / Tag', style: const TextStyle(fontSize: 12)) : null,
+                onTap: () => Navigator.pop(context, country),
+              );
+            },
+          ),
+        ),
+      ]),
+    );
+  }
 }

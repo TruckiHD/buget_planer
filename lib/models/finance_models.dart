@@ -225,6 +225,8 @@ class TripSegment {
   final bool accommodationPaid;
   final double? latitude;
   final double? longitude;
+  final bool isBaseLocation;
+  final int baseTransportCostCents;
 
   const TripSegment({
     required this.id,
@@ -240,6 +242,8 @@ class TripSegment {
     this.accommodationPaid = false,
     this.latitude,
     this.longitude,
+    this.isBaseLocation = false,
+    this.baseTransportCostCents = 0,
   });
 
   int get days => endsOn.difference(startsOn).inDays.clamp(1, 365).toInt();
@@ -260,6 +264,8 @@ class TripSegment {
         'accommodationPaid': accommodationPaid,
         if (latitude != null) 'latitude': latitude,
         if (longitude != null) 'longitude': longitude,
+        'isBaseLocation': isBaseLocation,
+        'baseTransportCostCents': baseTransportCostCents,
       };
 
   factory TripSegment.fromJson(Map<String, dynamic> json) => TripSegment(
@@ -276,6 +282,8 @@ class TripSegment {
         accommodationPaid: json['accommodationPaid'] as bool? ?? false,
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
+        isBaseLocation: json['isBaseLocation'] as bool? ?? false,
+        baseTransportCostCents: json['baseTransportCostCents'] as int? ?? 0,
       );
 
   TripSegment copyWith({
@@ -291,6 +299,8 @@ class TripSegment {
     bool? accommodationPaid,
     double? latitude,
     double? longitude,
+    bool? isBaseLocation,
+    int? baseTransportCostCents,
   }) {
     return TripSegment(
       id: id,
@@ -306,6 +316,8 @@ class TripSegment {
       accommodationPaid: accommodationPaid ?? this.accommodationPaid,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      isBaseLocation: isBaseLocation ?? this.isBaseLocation,
+      baseTransportCostCents: baseTransportCostCents ?? this.baseTransportCostCents,
     );
   }
 }
@@ -427,6 +439,7 @@ class FoodPriceData {
   final double mealMidRange;
   final double groceriesPerDay;
   final double coffeePrice;
+  final bool isCountryLevel;
 
   const FoodPriceData({
     required this.city,
@@ -435,6 +448,7 @@ class FoodPriceData {
     required this.mealMidRange,
     required this.groceriesPerDay,
     this.coffeePrice = 3.0,
+    this.isCountryLevel = false,
   });
 
   int get suggestedBudgetCents => ((mealInexpensive + mealMidRange) / 2 * 100).round();
@@ -449,6 +463,9 @@ class TripExpense {
   final int amountCents;
   final DateTime date;
   final bool isPaid;
+  final String? segmentId;
+  final bool isAttraction;
+  final String? attractionType;
 
   const TripExpense({
     required this.id,
@@ -457,6 +474,9 @@ class TripExpense {
     required this.amountCents,
     required this.date,
     this.isPaid = false,
+    this.segmentId,
+    this.isAttraction = false,
+    this.attractionType,
   });
 
   Map<String, dynamic> toJson() => {
@@ -466,6 +486,9 @@ class TripExpense {
         'amountCents': amountCents,
         'date': _dateValue(date),
         'isPaid': isPaid,
+        if (segmentId != null) 'segmentId': segmentId,
+        'isAttraction': isAttraction,
+        if (attractionType != null) 'attractionType': attractionType,
       };
 
   factory TripExpense.fromJson(Map<String, dynamic> json) => TripExpense(
@@ -475,6 +498,9 @@ class TripExpense {
         amountCents: json['amountCents'] as int,
         date: _date(json['date'] as String),
         isPaid: json['isPaid'] as bool? ?? false,
+        segmentId: json['segmentId'] as String?,
+        isAttraction: json['isAttraction'] as bool? ?? false,
+        attractionType: json['attractionType'] as String?,
       );
 }
 
@@ -502,6 +528,22 @@ class TripPlan {
   final List<TripSegment> segments;
   final List<TripExpense> expenses;
   final List<TripTransport> transports;
+  final String? travelPassType;
+  final int travelPassCents;
+  final int travelPassDays;
+  final TransportMode? outboundTransportMode;
+  final int outboundTransportCents;
+  final DateTime? outboundDate;
+  final TransportMode? returnTransportMode;
+  final int returnTransportCents;
+  final DateTime? returnDate;
+  final String? rentalCarCompany;
+  final DateTime? rentalCarStartDate;
+  final DateTime? rentalCarEndDate;
+  final int rentalCarCostCents;
+  final int rentalCarFuelCents;
+  final int rentalCarTollCents;
+  final int rentalCarParkingCents;
 
   const TripPlan({
     required this.id,
@@ -518,6 +560,22 @@ class TripPlan {
     this.segments = const [],
     this.expenses = const [],
     this.transports = const [],
+    this.travelPassType,
+    this.travelPassCents = 0,
+    this.travelPassDays = 0,
+    this.outboundTransportMode,
+    this.outboundTransportCents = 0,
+    this.outboundDate,
+    this.returnTransportMode,
+    this.returnTransportCents = 0,
+    this.returnDate,
+    this.rentalCarCompany,
+    this.rentalCarStartDate,
+    this.rentalCarEndDate,
+    this.rentalCarCostCents = 0,
+    this.rentalCarFuelCents = 0,
+    this.rentalCarTollCents = 0,
+    this.rentalCarParkingCents = 0,
   });
 
   int get days => endsOn.difference(startsOn).inDays.clamp(1, 365).toInt();
@@ -536,13 +594,19 @@ class TripPlan {
 
   int get dailyCostsCents => segments.isEmpty ? days * dailyBudgetCents : segmentFoodCents;
 
+  int get rentalCarTotalCents => rentalCarCostCents + rentalCarFuelCents + rentalCarTollCents + rentalCarParkingCents;
+
   int get subtotalCents => fixedCostsCents +
       dailyCostsCents +
       segmentAccommodationCents +
       segmentTransportCents +
       segmentOtherCents +
       expenseCents +
-      transportCents;
+      transportCents +
+      travelPassCents +
+      outboundTransportCents +
+      returnTransportCents +
+      rentalCarTotalCents;
 
   int get bufferCents => (subtotalCents * bufferPercent / 100).round();
 
@@ -553,6 +617,14 @@ class TripPlan {
       : budgetLimitCents - totalCostCents;
 
   bool get isOverBudget => budgetLimitCents > 0 && budgetRemainingCents < 0;
+
+  bool get hasTravelPass => travelPassType != null && travelPassType!.isNotEmpty;
+
+  bool get hasOutboundTransport => outboundTransportMode != null;
+
+  bool get hasReturnTransport => returnTransportMode != null;
+
+  bool get hasRentalCar => rentalCarCompany != null && rentalCarCompany!.isNotEmpty;
 
   int get paidCents => alreadyPaidCents +
       segments.where((segment) => segment.accommodationPaid).fold<int>(0, (sum, segment) => sum + segment.accommodationCostCents);
@@ -605,6 +677,22 @@ class TripPlan {
         'segments': segments.map((segment) => segment.toJson()).toList(),
         'expenses': expenses.map((expense) => expense.toJson()).toList(),
         'transports': transports.map((t) => t.toJson()).toList(),
+        if (travelPassType != null) 'travelPassType': travelPassType,
+        'travelPassCents': travelPassCents,
+        'travelPassDays': travelPassDays,
+        if (outboundTransportMode != null) 'outboundTransportMode': outboundTransportMode!.name,
+        'outboundTransportCents': outboundTransportCents,
+        if (outboundDate != null) 'outboundDate': _dateValue(outboundDate!),
+        if (returnTransportMode != null) 'returnTransportMode': returnTransportMode!.name,
+        'returnTransportCents': returnTransportCents,
+        if (returnDate != null) 'returnDate': _dateValue(returnDate!),
+        if (rentalCarCompany != null) 'rentalCarCompany': rentalCarCompany,
+        if (rentalCarStartDate != null) 'rentalCarStartDate': _dateValue(rentalCarStartDate!),
+        if (rentalCarEndDate != null) 'rentalCarEndDate': _dateValue(rentalCarEndDate!),
+        'rentalCarCostCents': rentalCarCostCents,
+        'rentalCarFuelCents': rentalCarFuelCents,
+        'rentalCarTollCents': rentalCarTollCents,
+        'rentalCarParkingCents': rentalCarParkingCents,
       };
 
   factory TripPlan.fromJson(Map<String, dynamic> json) => TripPlan(
@@ -628,6 +716,22 @@ class TripPlan {
         transports: (json['transports'] as List<dynamic>? ?? [])
             .map((item) => TripTransport.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList(),
+        travelPassType: json['travelPassType'] as String?,
+        travelPassCents: json['travelPassCents'] as int? ?? 0,
+        travelPassDays: json['travelPassDays'] as int? ?? 0,
+        outboundTransportMode: json['outboundTransportMode'] != null ? TransportMode.fromString(json['outboundTransportMode'] as String) : null,
+        outboundTransportCents: json['outboundTransportCents'] as int? ?? 0,
+        outboundDate: json['outboundDate'] != null ? _date(json['outboundDate'] as String) : null,
+        returnTransportMode: json['returnTransportMode'] != null ? TransportMode.fromString(json['returnTransportMode'] as String) : null,
+        returnTransportCents: json['returnTransportCents'] as int? ?? 0,
+        returnDate: json['returnDate'] != null ? _date(json['returnDate'] as String) : null,
+        rentalCarCompany: json['rentalCarCompany'] as String?,
+        rentalCarStartDate: json['rentalCarStartDate'] != null ? _date(json['rentalCarStartDate'] as String) : null,
+        rentalCarEndDate: json['rentalCarEndDate'] != null ? _date(json['rentalCarEndDate'] as String) : null,
+        rentalCarCostCents: json['rentalCarCostCents'] as int? ?? 0,
+        rentalCarFuelCents: json['rentalCarFuelCents'] as int? ?? 0,
+        rentalCarTollCents: json['rentalCarTollCents'] as int? ?? 0,
+        rentalCarParkingCents: json['rentalCarParkingCents'] as int? ?? 0,
       );
 
   TripPlan copyWith({
@@ -644,6 +748,22 @@ class TripPlan {
     List<TripSegment>? segments,
     List<TripExpense>? expenses,
     List<TripTransport>? transports,
+    String? travelPassType,
+    int? travelPassCents,
+    int? travelPassDays,
+    TransportMode? outboundTransportMode,
+    int? outboundTransportCents,
+    DateTime? outboundDate,
+    TransportMode? returnTransportMode,
+    int? returnTransportCents,
+    DateTime? returnDate,
+    String? rentalCarCompany,
+    DateTime? rentalCarStartDate,
+    DateTime? rentalCarEndDate,
+    int? rentalCarCostCents,
+    int? rentalCarFuelCents,
+    int? rentalCarTollCents,
+    int? rentalCarParkingCents,
   }) {
     return TripPlan(
       id: id,
@@ -660,6 +780,22 @@ class TripPlan {
       segments: segments ?? this.segments,
       expenses: expenses ?? this.expenses,
       transports: transports ?? this.transports,
+      travelPassType: travelPassType ?? this.travelPassType,
+      travelPassCents: travelPassCents ?? this.travelPassCents,
+      travelPassDays: travelPassDays ?? this.travelPassDays,
+      outboundTransportMode: outboundTransportMode ?? this.outboundTransportMode,
+      outboundTransportCents: outboundTransportCents ?? this.outboundTransportCents,
+      outboundDate: outboundDate ?? this.outboundDate,
+      returnTransportMode: returnTransportMode ?? this.returnTransportMode,
+      returnTransportCents: returnTransportCents ?? this.returnTransportCents,
+      returnDate: returnDate ?? this.returnDate,
+      rentalCarCompany: rentalCarCompany ?? this.rentalCarCompany,
+      rentalCarStartDate: rentalCarStartDate ?? this.rentalCarStartDate,
+      rentalCarEndDate: rentalCarEndDate ?? this.rentalCarEndDate,
+      rentalCarCostCents: rentalCarCostCents ?? this.rentalCarCostCents,
+      rentalCarFuelCents: rentalCarFuelCents ?? this.rentalCarFuelCents,
+      rentalCarTollCents: rentalCarTollCents ?? this.rentalCarTollCents,
+      rentalCarParkingCents: rentalCarParkingCents ?? this.rentalCarParkingCents,
     );
   }
 }

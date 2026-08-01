@@ -88,6 +88,11 @@ class TripExpenseTile extends StatelessWidget {
       case 'essen': return AppColors.green;
       case 'aktivität': case 'aktivitaet': return AppColors.pink;
       case 'shopping': return const Color(0xFFFF6D00);
+      case 'attraktion': return const Color(0xFF7B61FF);
+      case 'visum & dokumente': case 'visum': return const Color(0xFF00B8D9);
+      case 'versicherung': return const Color(0xFF20966A);
+      case 'kommunikation': return const Color(0xFFE19A35);
+      case 'gesundheit': return const Color(0xFFE05B9A);
       default: return const Color(0xFF78839A);
     }
   }
@@ -99,6 +104,11 @@ class TripExpenseTile extends StatelessWidget {
       case 'essen': return Icons.restaurant_rounded;
       case 'aktivität': case 'aktivitaet': return Icons.local_activity_outlined;
       case 'shopping': return Icons.shopping_bag_outlined;
+      case 'attraktion': return Icons.museum_rounded;
+      case 'visum & dokumente': case 'visum': return Icons.description_rounded;
+      case 'versicherung': return Icons.shield_rounded;
+      case 'kommunikation': return Icons.sim_card_rounded;
+      case 'gesundheit': return Icons.favorite_rounded;
       default: return Icons.receipt_long_outlined;
     }
   }

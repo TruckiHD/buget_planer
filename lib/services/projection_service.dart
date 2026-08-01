@@ -228,11 +228,15 @@ class ProjectionService {
     for (final trip in profile.trips) {
       if (trip.startsOn.year == month.year && trip.startsOn.month == month.month) {
         total += trip.fixedCostsCents + trip.bufferCents;
+        total += trip.outboundTransportCents + trip.returnTransportCents;
+        total += trip.rentalCarTotalCents;
+        total += trip.travelPassCents;
       }
       for (final segment in trip.segments) {
         if (segment.startsOn.year == month.year && segment.startsOn.month == month.month) {
           if (!segment.accommodationPaid) total += segment.accommodationCostCents;
           total += segment.transportCostCents + segment.otherCostCents;
+          total += segment.baseTransportCostCents;
         }
         total += _dailyCostInMonth(segment.startsOn, segment.endsOn, segment.dailyFoodBudgetCents, month);
       }

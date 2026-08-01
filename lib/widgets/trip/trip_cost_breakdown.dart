@@ -91,6 +91,18 @@ class TripCostBreakdown extends StatelessWidget {
     if (trip.expenseCents > 0) {
       items.add(_CostItem('Kosten', trip.expenseCents, AppColors.pink));
     }
+    if (trip.travelPassCents > 0) {
+      items.add(_CostItem('Reisepass', trip.travelPassCents, const Color(0xFF7B61FF)));
+    }
+    if (trip.outboundTransportCents > 0) {
+      items.add(_CostItem('Hinfahrt', trip.outboundTransportCents, const Color(0xFF5669E8)));
+    }
+    if (trip.returnTransportCents > 0) {
+      items.add(_CostItem('Rückfahrt', trip.returnTransportCents, const Color(0xFF5669E8)));
+    }
+    if (trip.rentalCarTotalCents > 0) {
+      items.add(_CostItem('Mietwagen', trip.rentalCarTotalCents, const Color(0xFF78839A)));
+    }
     if (trip.fixedCostsCents > 0) {
       items.add(_CostItem('Fixkosten', trip.fixedCostsCents, const Color(0xFF7B61FF)));
     }
