@@ -144,33 +144,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 12),
               _cashflowCard(),
               const SizedBox(height: 22),
-              _sectionTitle('Ausgaben nach Kategorie', 'Wo geht dein Geld hin?'),
+              _dashboardCollapsible(
+                icon: Icons.pie_chart_outline_rounded,
+                title: 'Ausgaben nach Kategorie',
+                initiallyExpanded: false,
+                child: _categoryChartCard(),
+              ),
               const SizedBox(height: 12),
-              _categoryChartCard(),
-              const SizedBox(height: 22),
-              _sectionTitle('Kontostand-Prognose', 'Die nächsten 12 Monate'),
+              _dashboardCollapsible(
+                icon: Icons.show_chart_rounded,
+                title: 'Kontostand-Prognose',
+                initiallyExpanded: false,
+                child: _balanceChartCard(),
+              ),
               const SizedBox(height: 12),
-              _balanceChartCard(),
-              const SizedBox(height: 22),
-              _sectionTitle('Jahresrückblick', 'Dein Finanzjahr auf einen Blick'),
+              _dashboardCollapsible(
+                icon: Icons.calendar_month_rounded,
+                title: 'Jahresrückblick',
+                initiallyExpanded: false,
+                child: _yearReviewCard(),
+              ),
               const SizedBox(height: 12),
-              _yearReviewCard(),
-              const SizedBox(height: 22),
-              _sectionTitle('Nächstes Ziel', 'Prognose statt Bauchgefühl'),
+              _dashboardCollapsible(
+                icon: Icons.flight_takeoff_rounded,
+                title: 'Nächstes Ziel',
+                initiallyExpanded: false,
+                child: _profile.trips.isEmpty
+                    ? _surface(child: EmptyState(
+                        icon: Icons.flight_takeoff_rounded,
+                        title: 'Noch keine Reise geplant',
+                        subtitle: 'Erstelle dein erstes Ziel über den Reisen-Bereich.',
+                        isDark: _isDark,
+                      ))
+                    : _tripCard(_profile.trips.first),
+              ),
               const SizedBox(height: 12),
-              if (_profile.trips.isEmpty)
-                _surface(child: EmptyState(
-                  icon: Icons.flight_takeoff_rounded,
-                  title: 'Noch keine Reise geplant',
-                  subtitle: 'Erstelle dein erstes Ziel über den Reisen-Bereich.',
-                  isDark: _isDark,
-                ))
-              else
-                _tripCard(_profile.trips.first),
-              const SizedBox(height: 22),
-              _sectionTitle('Szenario testen', 'Wie robust ist dein Plan?'),
-              const SizedBox(height: 12),
-              _scenarioCard(),
+              _dashboardCollapsible(
+                icon: Icons.science_outlined,
+                title: 'Szenario testen',
+                initiallyExpanded: false,
+                child: _scenarioCard(),
+              ),
             ],
           ),
         ),
@@ -564,7 +578,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             setState(() => _profile = _profile.copyWith(recurringTransactions: _profile.recurringTransactions.where((t) => t.id != item.id).toList()));
             await _persistProfile();
           },
-          child: ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: Container(width: 36, height: 36, decoration: BoxDecoration(color: item.categoryColor.withValues(alpha: .12), shape: BoxShape.circle), child: Icon(item.categoryIcon, size: 18, color: item.categoryColor)), title: Text(item.title), subtitle: Text('${item.categoryLabel} · ${_frequencyLabel(item.frequency)} · am ${item.dayOfMonth}.'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [Text('${item.kind == TransactionKind.income ? '+' : '-'}${_money(item.amountCents)}', style: const TextStyle(fontWeight: FontWeight.w700)), IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showAddRecurring(item), tooltip: 'Bearbeiten')])),
+          child: Material(color: Colors.transparent, child: ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: Container(width: 36, height: 36, decoration: BoxDecoration(color: item.categoryColor.withValues(alpha: .12), shape: BoxShape.circle), child: Icon(item.categoryIcon, size: 18, color: item.categoryColor)), title: Text(item.title), subtitle: Text('${item.categoryLabel} · ${_frequencyLabel(item.frequency)} · am ${item.dayOfMonth}.'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [Text('${item.kind == TransactionKind.income ? '+' : '-'}${_money(item.amountCents)}', style: const TextStyle(fontWeight: FontWeight.w700)), IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showAddRecurring(item), tooltip: 'Bearbeiten')]))),
         )),
       ]));
 
@@ -633,7 +647,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           setState(() => _profile = _profile.copyWith(entries: _profile.entries.where((item) => item.id != entry.id).toList(), currentBalanceCents: entry.isConfirmed ? _profile.currentBalanceCents - entry.signedAmountCents : null));
           await _persistProfile();
         },
-        child: ListTile(
+        child: Material(color: Colors.transparent, child: ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Container(
             width: 36,
@@ -644,7 +658,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           title: Text(entry.title, style: const TextStyle(fontWeight: FontWeight.w600)),
           subtitle: Text('${entry.categoryLabel} · ${_shortDate(entry.date)}${entry.isConfirmed ? ' · bestätigt' : ' · geplant'}'),
           trailing: Text('${entry.kind == TransactionKind.income ? '+' : '-'}${_money(entry.amountCents)}', style: TextStyle(fontWeight: FontWeight.w700, color: entry.kind == TransactionKind.income ? const Color(0xFF20966A) : const Color(0xFFD94E5A))),
-        ),
+        )),
       );
 
   Widget _goalTile(SavingsGoal goal) => Padding(
@@ -690,6 +704,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
     boxShadow: [BoxShadow(color: _shadowColor, blurRadius: 20, offset: const Offset(0, 8))],
     child: child,
   );
+
+  Widget _dashboardCollapsible({
+    required IconData icon,
+    required String title,
+    required bool initiallyExpanded,
+    required Widget child,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _surfaceColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: _shadowColor, blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+          initiallyExpanded: initiallyExpanded,
+          leading: Icon(icon, color: AppColors.primary, size: 20),
+          title: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          shape: const Border(),
+          children: [child],
+        ),
+      ),
+    );
+  }
 
   Widget _sectionTitle(String title, String subtitle) => Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.headlineSmall), Text(subtitle, style: Theme.of(context).textTheme.bodyMedium)])), Icon(Icons.more_horiz_rounded, color: _mutedColor)]);
 

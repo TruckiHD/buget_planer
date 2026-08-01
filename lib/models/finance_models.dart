@@ -223,6 +223,8 @@ class TripSegment {
   final int transportCostCents;
   final int otherCostCents;
   final bool accommodationPaid;
+  final double? latitude;
+  final double? longitude;
 
   const TripSegment({
     required this.id,
@@ -236,10 +238,13 @@ class TripSegment {
     this.transportCostCents = 0,
     this.otherCostCents = 0,
     this.accommodationPaid = false,
+    this.latitude,
+    this.longitude,
   });
 
   int get days => endsOn.difference(startsOn).inDays.clamp(1, 365).toInt();
   int get foodCostCents => days * dailyFoodBudgetCents;
+  bool get hasCoordinates => latitude != null && longitude != null;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -253,6 +258,8 @@ class TripSegment {
         'transportCostCents': transportCostCents,
         'otherCostCents': otherCostCents,
         'accommodationPaid': accommodationPaid,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
       };
 
   factory TripSegment.fromJson(Map<String, dynamic> json) => TripSegment(
@@ -267,7 +274,172 @@ class TripSegment {
         transportCostCents: json['transportCostCents'] as int? ?? 0,
         otherCostCents: json['otherCostCents'] as int? ?? 0,
         accommodationPaid: json['accommodationPaid'] as bool? ?? false,
+        latitude: (json['latitude'] as num?)?.toDouble(),
+        longitude: (json['longitude'] as num?)?.toDouble(),
       );
+
+  TripSegment copyWith({
+    String? name,
+    String? location,
+    DateTime? startsOn,
+    DateTime? endsOn,
+    String? accommodationName,
+    int? accommodationCostCents,
+    int? dailyFoodBudgetCents,
+    int? transportCostCents,
+    int? otherCostCents,
+    bool? accommodationPaid,
+    double? latitude,
+    double? longitude,
+  }) {
+    return TripSegment(
+      id: id,
+      name: name ?? this.name,
+      location: location ?? this.location,
+      startsOn: startsOn ?? this.startsOn,
+      endsOn: endsOn ?? this.endsOn,
+      accommodationName: accommodationName ?? this.accommodationName,
+      accommodationCostCents: accommodationCostCents ?? this.accommodationCostCents,
+      dailyFoodBudgetCents: dailyFoodBudgetCents ?? this.dailyFoodBudgetCents,
+      transportCostCents: transportCostCents ?? this.transportCostCents,
+      otherCostCents: otherCostCents ?? this.otherCostCents,
+      accommodationPaid: accommodationPaid ?? this.accommodationPaid,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+    );
+  }
+}
+
+enum TransportMode {
+  zug(Icons.train_rounded, 'Zug', Color(0xFF5669E8)),
+  bus(Icons.directions_bus_rounded, 'Bus', Color(0xFF20966A)),
+  flug(Icons.flight_rounded, 'Flug', Color(0xFFE19A35)),
+  faehre(Icons.directions_boat_rounded, 'Fähre', Color(0xFF00B8D9)),
+  auto(Icons.directions_car_rounded, 'Auto', Color(0xFF78839A));
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const TransportMode(this.icon, this.label, this.color);
+
+  static TransportMode fromString(String value) {
+    for (final mode in TransportMode.values) {
+      if (mode.name == value || mode.label == value) return mode;
+    }
+    return TransportMode.zug;
+  }
+}
+
+class TripTransport {
+  final String id;
+  final String? fromSegmentId;
+  final String? toSegmentId;
+  final String fromLocation;
+  final String toLocation;
+  final TransportMode mode;
+  final int estimatedCostCents;
+  final int? durationMinutes;
+  final DateTime departureDate;
+  final String? bookingReference;
+  final bool isBooked;
+  final String? notes;
+
+  const TripTransport({
+    required this.id,
+    this.fromSegmentId,
+    this.toSegmentId,
+    required this.fromLocation,
+    required this.toLocation,
+    this.mode = TransportMode.zug,
+    this.estimatedCostCents = 0,
+    this.durationMinutes,
+    required this.departureDate,
+    this.bookingReference,
+    this.isBooked = false,
+    this.notes,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        if (fromSegmentId != null) 'fromSegmentId': fromSegmentId,
+        if (toSegmentId != null) 'toSegmentId': toSegmentId,
+        'fromLocation': fromLocation,
+        'toLocation': toLocation,
+        'mode': mode.name,
+        'estimatedCostCents': estimatedCostCents,
+        if (durationMinutes != null) 'durationMinutes': durationMinutes,
+        'departureDate': _dateValue(departureDate),
+        if (bookingReference != null) 'bookingReference': bookingReference,
+        'isBooked': isBooked,
+        if (notes != null) 'notes': notes,
+      };
+
+  factory TripTransport.fromJson(Map<String, dynamic> json) => TripTransport(
+        id: json['id'] as String,
+        fromSegmentId: json['fromSegmentId'] as String?,
+        toSegmentId: json['toSegmentId'] as String?,
+        fromLocation: json['fromLocation'] as String,
+        toLocation: json['toLocation'] as String,
+        mode: json['mode'] != null
+            ? TransportMode.fromString(json['mode'] as String)
+            : TransportMode.zug,
+        estimatedCostCents: json['estimatedCostCents'] as int? ?? 0,
+        durationMinutes: json['durationMinutes'] as int?,
+        departureDate: _date(json['departureDate'] as String),
+        bookingReference: json['bookingReference'] as String?,
+        isBooked: json['isBooked'] as bool? ?? false,
+        notes: json['notes'] as String?,
+      );
+
+  TripTransport copyWith({
+    String? fromLocation,
+    String? toLocation,
+    TransportMode? mode,
+    int? estimatedCostCents,
+    int? durationMinutes,
+    DateTime? departureDate,
+    String? bookingReference,
+    bool? isBooked,
+    String? notes,
+  }) {
+    return TripTransport(
+      id: id,
+      fromSegmentId: fromSegmentId,
+      toSegmentId: toSegmentId,
+      fromLocation: fromLocation ?? this.fromLocation,
+      toLocation: toLocation ?? this.toLocation,
+      mode: mode ?? this.mode,
+      estimatedCostCents: estimatedCostCents ?? this.estimatedCostCents,
+      durationMinutes: durationMinutes ?? this.durationMinutes,
+      departureDate: departureDate ?? this.departureDate,
+      bookingReference: bookingReference ?? this.bookingReference,
+      isBooked: isBooked ?? this.isBooked,
+      notes: notes ?? this.notes,
+    );
+  }
+}
+
+class FoodPriceData {
+  final String city;
+  final String country;
+  final double mealInexpensive;
+  final double mealMidRange;
+  final double groceriesPerDay;
+  final double coffeePrice;
+
+  const FoodPriceData({
+    required this.city,
+    required this.country,
+    required this.mealInexpensive,
+    required this.mealMidRange,
+    required this.groceriesPerDay,
+    this.coffeePrice = 3.0,
+  });
+
+  int get suggestedBudgetCents => ((mealInexpensive + mealMidRange) / 2 * 100).round();
+  int get budgetCents => (mealInexpensive * 100 * 2).round();
+  int get comfortableCents => (mealMidRange * 100).round();
 }
 
 class TripExpense {
@@ -329,6 +501,7 @@ class TripPlan {
   final int reservedCents;
   final List<TripSegment> segments;
   final List<TripExpense> expenses;
+  final List<TripTransport> transports;
 
   const TripPlan({
     required this.id,
@@ -344,6 +517,7 @@ class TripPlan {
     this.reservedCents = 0,
     this.segments = const [],
     this.expenses = const [],
+    this.transports = const [],
   });
 
   int get days => endsOn.difference(startsOn).inDays.clamp(1, 365).toInt();
@@ -358,6 +532,8 @@ class TripPlan {
 
   int get expenseCents => expenses.fold<int>(0, (sum, expense) => sum + expense.amountCents);
 
+  int get transportCents => transports.fold<int>(0, (sum, t) => sum + t.estimatedCostCents);
+
   int get dailyCostsCents => segments.isEmpty ? days * dailyBudgetCents : segmentFoodCents;
 
   int get subtotalCents => fixedCostsCents +
@@ -365,7 +541,8 @@ class TripPlan {
       segmentAccommodationCents +
       segmentTransportCents +
       segmentOtherCents +
-      expenseCents;
+      expenseCents +
+      transportCents;
 
   int get bufferCents => (subtotalCents * bufferPercent / 100).round();
 
@@ -427,6 +604,7 @@ class TripPlan {
         'reservedCents': reservedCents,
         'segments': segments.map((segment) => segment.toJson()).toList(),
         'expenses': expenses.map((expense) => expense.toJson()).toList(),
+        'transports': transports.map((t) => t.toJson()).toList(),
       };
 
   factory TripPlan.fromJson(Map<String, dynamic> json) => TripPlan(
@@ -447,6 +625,9 @@ class TripPlan {
         expenses: (json['expenses'] as List<dynamic>? ?? [])
             .map((item) => TripExpense.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList(),
+        transports: (json['transports'] as List<dynamic>? ?? [])
+            .map((item) => TripTransport.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList(),
       );
 
   TripPlan copyWith({
@@ -462,6 +643,7 @@ class TripPlan {
     int? reservedCents,
     List<TripSegment>? segments,
     List<TripExpense>? expenses,
+    List<TripTransport>? transports,
   }) {
     return TripPlan(
       id: id,
@@ -477,6 +659,7 @@ class TripPlan {
       reservedCents: reservedCents ?? this.reservedCents,
       segments: segments ?? this.segments,
       expenses: expenses ?? this.expenses,
+      transports: transports ?? this.transports,
     );
   }
 }
