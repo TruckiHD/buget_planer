@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/finance_models.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/currency_utils.dart';
 import '../../utils/squircle_container.dart';
 import 'trip_cost_breakdown.dart';
 
@@ -51,13 +52,13 @@ class TripBudgetHeader extends StatelessWidget {
         ]),
         const SizedBox(height: 18),
         Row(children: [
-          _metric('Geplant', _money(trip.totalCostCents), overLimit ? AppColors.red : AppColors.green, mutedColor),
+          _metric('Geplant', CurrencyUtils.formatCents(trip.totalCostCents), overLimit ? AppColors.red : AppColors.green, mutedColor),
           const SizedBox(width: 20),
-          if (trip.budgetLimitCents > 0) _metric('Limit', _money(trip.budgetLimitCents), AppColors.primary, mutedColor),
+          if (trip.budgetLimitCents > 0) _metric('Limit', CurrencyUtils.formatCents(trip.budgetLimitCents), AppColors.primary, mutedColor),
           if (trip.budgetLimitCents > 0) const SizedBox(width: 20),
-          _metric('Offen', _money(trip.remainingCostCents), overLimit ? AppColors.red : AppColors.green, mutedColor),
+          _metric('Offen', CurrencyUtils.formatCents(trip.remainingCostCents), overLimit ? AppColors.red : AppColors.green, mutedColor),
           const SizedBox(width: 20),
-          _metric('Bezahlt', _money(trip.paidCents), AppColors.green, mutedColor),
+          _metric('Bezahlt', CurrencyUtils.formatCents(trip.paidCents), AppColors.green, mutedColor),
         ]),
         if (trip.budgetLimitCents > 0) ...[
           const SizedBox(height: 14),
@@ -111,5 +112,5 @@ class TripBudgetHeader extends StatelessWidget {
     ]),
   );
 
-  String _money(int cents) => '${cents < 0 ? '-' : ''}${(cents.abs() / 100).toStringAsFixed(0)} €';
+
 }

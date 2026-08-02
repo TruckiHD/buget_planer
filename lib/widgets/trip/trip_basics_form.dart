@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../models/finance_models.dart';
+import '../../services/currency_service.dart';
 import '../../services/food_price_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/currency_utils.dart';
 
 class TripBasicsForm extends StatefulWidget {
   final TripPlan trip;
@@ -52,6 +54,7 @@ class _TripBasicsFormState extends State<TripBasicsForm> {
   bool _showRentalCar = false;
   TransportMode? _outboundMode;
   TransportMode? _returnMode;
+  String? _targetCurrency;
 
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
   Color get _mutedColor => _isDark ? AppColors.darkMuted : AppColors.lightMuted;
@@ -62,22 +65,22 @@ class _TripBasicsFormState extends State<TripBasicsForm> {
     final t = widget.trip;
     _nameController = TextEditingController(text: t.name);
     _destinationController = TextEditingController(text: t.destination);
-    _fixedController = TextEditingController(text: _euros(t.fixedCostsCents));
-    _dailyController = TextEditingController(text: _euros(t.dailyBudgetCents));
-    _limitController = TextEditingController(text: t.budgetLimitCents == 0 ? '' : _euros(t.budgetLimitCents));
-    _paidController = TextEditingController(text: _euros(t.alreadyPaidCents));
-    _reservedController = TextEditingController(text: t.reservedCents == 0 ? '' : _euros(t.reservedCents));
+    _fixedController = TextEditingController(text: CurrencyUtils.formatCentsInput(t.fixedCostsCents));
+    _dailyController = TextEditingController(text: CurrencyUtils.formatCentsInput(t.dailyBudgetCents));
+    _limitController = TextEditingController(text: t.budgetLimitCents == 0 ? '' : CurrencyUtils.formatCentsInput(t.budgetLimitCents));
+    _paidController = TextEditingController(text: CurrencyUtils.formatCentsInput(t.alreadyPaidCents));
+    _reservedController = TextEditingController(text: t.reservedCents == 0 ? '' : CurrencyUtils.formatCentsInput(t.reservedCents));
     _bufferController = TextEditingController(text: t.bufferPercent == 0 ? '' : '${t.bufferPercent}');
     _travelPassTypeController = TextEditingController(text: t.travelPassType ?? '');
-    _travelPassCostController = TextEditingController(text: t.travelPassCents == 0 ? '' : _euros(t.travelPassCents));
+    _travelPassCostController = TextEditingController(text: t.travelPassCents == 0 ? '' : CurrencyUtils.formatCentsInput(t.travelPassCents));
     _travelPassDaysController = TextEditingController(text: t.travelPassDays == 0 ? '' : '${t.travelPassDays}');
-    _outboundCostController = TextEditingController(text: t.outboundTransportCents == 0 ? '' : _euros(t.outboundTransportCents));
-    _returnCostController = TextEditingController(text: t.returnTransportCents == 0 ? '' : _euros(t.returnTransportCents));
+    _outboundCostController = TextEditingController(text: t.outboundTransportCents == 0 ? '' : CurrencyUtils.formatCentsInput(t.outboundTransportCents));
+    _returnCostController = TextEditingController(text: t.returnTransportCents == 0 ? '' : CurrencyUtils.formatCentsInput(t.returnTransportCents));
     _rentalCompanyController = TextEditingController(text: t.rentalCarCompany ?? '');
-    _rentalCostController = TextEditingController(text: t.rentalCarCostCents == 0 ? '' : _euros(t.rentalCarCostCents));
-    _rentalFuelController = TextEditingController(text: t.rentalCarFuelCents == 0 ? '' : _euros(t.rentalCarFuelCents));
-    _rentalTollController = TextEditingController(text: t.rentalCarTollCents == 0 ? '' : _euros(t.rentalCarTollCents));
-    _rentalParkingController = TextEditingController(text: t.rentalCarParkingCents == 0 ? '' : _euros(t.rentalCarParkingCents));
+    _rentalCostController = TextEditingController(text: t.rentalCarCostCents == 0 ? '' : CurrencyUtils.formatCentsInput(t.rentalCarCostCents));
+    _rentalFuelController = TextEditingController(text: t.rentalCarFuelCents == 0 ? '' : CurrencyUtils.formatCentsInput(t.rentalCarFuelCents));
+    _rentalTollController = TextEditingController(text: t.rentalCarTollCents == 0 ? '' : CurrencyUtils.formatCentsInput(t.rentalCarTollCents));
+    _rentalParkingController = TextEditingController(text: t.rentalCarParkingCents == 0 ? '' : CurrencyUtils.formatCentsInput(t.rentalCarParkingCents));
     _tripStartsOn = t.startsOn;
     _tripEndsOn = t.endsOn;
     _outboundDate = t.outboundDate;
@@ -89,6 +92,7 @@ class _TripBasicsFormState extends State<TripBasicsForm> {
     _showTravelPass = t.hasTravelPass;
     _showOutbound = t.hasOutboundTransport;
     _showRentalCar = t.hasRentalCar;
+    _targetCurrency = t.targetCurrency;
   }
 
   @override
@@ -113,28 +117,29 @@ class _TripBasicsFormState extends State<TripBasicsForm> {
       destination: _destinationController.text.trim(),
       startsOn: _tripStartsOn,
       endsOn: _tripEndsOn,
-      fixedCostsCents: _parseAmount(_fixedController.text),
-      dailyBudgetCents: _parseAmount(_dailyController.text),
-      budgetLimitCents: _parseAmount(_limitController.text),
+      fixedCostsCents: CurrencyUtils.parseCents(_fixedController.text),
+      dailyBudgetCents: CurrencyUtils.parseCents(_dailyController.text),
+      budgetLimitCents: CurrencyUtils.parseCents(_limitController.text),
       bufferPercent: bufferPercent,
-      alreadyPaidCents: _parseAmount(_paidController.text),
-      reservedCents: _parseAmount(_reservedController.text),
+      alreadyPaidCents: CurrencyUtils.parseCents(_paidController.text),
+      reservedCents: CurrencyUtils.parseCents(_reservedController.text),
       travelPassType: _showTravelPass ? _travelPassTypeController.text.trim() : null,
-      travelPassCents: _showTravelPass ? _parseAmount(_travelPassCostController.text) : 0,
+      travelPassCents: _showTravelPass ? CurrencyUtils.parseCents(_travelPassCostController.text) : 0,
       travelPassDays: _showTravelPass ? travelPassDays : 0,
       outboundTransportMode: _showOutbound ? _outboundMode : null,
-      outboundTransportCents: _showOutbound ? _parseAmount(_outboundCostController.text) : 0,
+      outboundTransportCents: _showOutbound ? CurrencyUtils.parseCents(_outboundCostController.text) : 0,
       outboundDate: _showOutbound ? _outboundDate : null,
       returnTransportMode: _showOutbound ? _returnMode : null,
-      returnTransportCents: _showOutbound ? _parseAmount(_returnCostController.text) : 0,
+      returnTransportCents: _showOutbound ? CurrencyUtils.parseCents(_returnCostController.text) : 0,
       returnDate: _showOutbound ? _returnDate : null,
       rentalCarCompany: _showRentalCar ? _rentalCompanyController.text.trim() : null,
       rentalCarStartDate: _showRentalCar ? _rentalStartDate : null,
       rentalCarEndDate: _showRentalCar ? _rentalEndDate : null,
-      rentalCarCostCents: _showRentalCar ? _parseAmount(_rentalCostController.text) : 0,
-      rentalCarFuelCents: _showRentalCar ? _parseAmount(_rentalFuelController.text) : 0,
-      rentalCarTollCents: _showRentalCar ? _parseAmount(_rentalTollController.text) : 0,
-      rentalCarParkingCents: _showRentalCar ? _parseAmount(_rentalParkingController.text) : 0,
+      rentalCarCostCents: _showRentalCar ? CurrencyUtils.parseCents(_rentalCostController.text) : 0,
+      rentalCarFuelCents: _showRentalCar ? CurrencyUtils.parseCents(_rentalFuelController.text) : 0,
+      rentalCarTollCents: _showRentalCar ? CurrencyUtils.parseCents(_rentalTollController.text) : 0,
+      rentalCarParkingCents: _showRentalCar ? CurrencyUtils.parseCents(_rentalParkingController.text) : 0,
+      targetCurrency: _targetCurrency,
     );
     await widget.onChanged(updated);
   }
@@ -147,11 +152,13 @@ class _TripBasicsFormState extends State<TripBasicsForm> {
       const SizedBox(height: 10),
       TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Name'), onChanged: (_) => _scheduleSave()),
       const SizedBox(height: 10),
-      TextField(controller: _destinationController, decoration: const InputDecoration(labelText: 'Ziel / Regionen'), onChanged: (_) => setState(() => _scheduleSave())),
+      TextField(controller: _destinationController, decoration: const InputDecoration(labelText: 'Ziel / Regionen'), onChanged: (_) => setState(() { _scheduleSave(); _autoDetectCurrency(); })),
       if (foodSuggestion != null) ...[
         const SizedBox(height: 6),
         _foodSuggestionChip(foodSuggestion),
       ],
+      const SizedBox(height: 10),
+      _currencySelector(),
       if (widget.trip.segments.isNotEmpty) ...[
         const SizedBox(height: 6),
         _applyToAllChip(),
@@ -234,6 +241,67 @@ class _TripBasicsFormState extends State<TripBasicsForm> {
         curve: Curves.easeInOut,
         child: _showTravelPass ? _buildTravelPassFields() : const SizedBox.shrink(),
       ),
+    ]);
+  }
+
+  void _autoDetectCurrency() {
+    final dest = _destinationController.text;
+    if (dest.isEmpty) return;
+    final detected = CurrencyService.detectCurrency(dest);
+    if (detected != null && detected != 'EUR') {
+      setState(() => _targetCurrency = detected);
+    }
+  }
+
+  Widget _currencySelector() {
+    final currencies = CurrencyService.supportedCurrencies.entries.toList()
+      ..sort((a, b) => a.value.name.compareTo(b.value.name));
+    final rate = _targetCurrency != null ? CurrencyService.getRate(_targetCurrency!) : null;
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            value: _targetCurrency,
+            decoration: const InputDecoration(
+              labelText: 'Zielwährung',
+              helperText: 'Optional: Lokale Währung für Preisvergleich',
+            ),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('Euro (€)')),
+              ...currencies.map((e) => DropdownMenuItem(
+                value: e.key,
+                child: Text('${e.value.name} (${e.value.symbol})'),
+              )),
+            ],
+            onChanged: (v) {
+              setState(() => _targetCurrency = v);
+              _scheduleSave();
+            },
+          ),
+        ),
+      ]),
+      if (_targetCurrency != null && rate != null) ...[
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: .06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.primary.withValues(alpha: .2)),
+          ),
+          child: Row(children: [
+            const Icon(Icons.currency_exchange_rounded, size: 16, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Expanded(child: Text(
+              '1 € = ${rate.toStringAsFixed(2)} $_targetCurrency',
+              style: TextStyle(fontSize: 12, color: AppColors.primary.withValues(alpha: .8), fontWeight: FontWeight.w600),
+            )),
+            if (!CurrencyService.isLoaded)
+              SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+          ]),
+        ),
+      ],
     ]);
   }
 
@@ -426,7 +494,7 @@ class _TripBasicsFormState extends State<TripBasicsForm> {
   }
 
   Future<void> _applyToAllSegments() async {
-    final cents = _parseAmount(_dailyController.text);
+    final cents = CurrencyUtils.parseCents(_dailyController.text);
     if (cents <= 0) return;
 
     final count = widget.trip.segments.length;
@@ -494,7 +562,4 @@ class _TripBasicsFormState extends State<TripBasicsForm> {
     });
     _scheduleSave();
   }
-
-  String _euros(int cents) => (cents / 100).toStringAsFixed(2);
-  int _parseAmount(String value) => ((double.tryParse(value.replaceAll(',', '.')) ?? 0) * 100).round();
 }

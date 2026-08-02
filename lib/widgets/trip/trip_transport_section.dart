@@ -5,9 +5,11 @@ import '../../models/finance_models.dart';
 import '../../services/booking_service.dart';
 import '../../services/route_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/currency_utils.dart';
 import '../../utils/squircle_container.dart';
+import 'trip_transport_editor.dart';
 
-class TripTransportSection extends StatelessWidget {
+class TripTransportSection extends StatefulWidget {
   final TripPlan trip;
   final bool isDark;
   final Future<void> Function(TripPlan updated) onChanged;
@@ -20,44 +22,96 @@ class TripTransportSection extends StatelessWidget {
   });
 
   @override
+  State<TripTransportSection> createState() => _TripTransportSectionState();
+}
+
+class _TripTransportSectionState extends State<TripTransportSection> {
+  late Future<List<TripTransport>> _routesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _routesFuture = _loadRoutes();
+  }
+
+  @override
+  void didUpdateWidget(TripTransportSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.trip != widget.trip) {
+      _routesFuture = _loadRoutes();
+    }
+  }
+
+  Future<List<TripTransport>> _loadRoutes() async {
+    final missingRoutes = await RouteService.generateMissingRoutes(widget.trip);
+    return [...widget.trip.transports, ...missingRoutes];
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final surfaceColor = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final shadowColor = isDark ? AppColors.darkCardShadow : AppColors.lightCardShadow;
+    final surfaceColor = widget.isDark ? AppColors.darkSurface : AppColors.lightSurface;
+    final shadowColor = widget.isDark ? AppColors.darkCardShadow : AppColors.lightCardShadow;
 
-    final allTransports = [...trip.transports];
-    final missingRoutes = RouteService.generateMissingRoutes(trip);
-    allTransports.addAll(missingRoutes);
-    allTransports.sort((a, b) => a.departureDate.compareTo(b.departureDate));
+    return FutureBuilder<List<TripTransport>>(
+      future: _routesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return SquircleContainer(
+            borderRadius: BorderRadius.circular(24),
+            padding: const EdgeInsets.all(20),
+            backgroundColor: surfaceColor,
+            boxShadow: [BoxShadow(color: shadowColor, blurRadius: 18, offset: const Offset(0, 7))],
+            child: const Column(
+              children: [
+                Row(children: [
+                  Icon(Icons.train_rounded, color: AppColors.primary, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Verbindungen')),
+                  SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                ]),
+                SizedBox(height: 14),
+                Text('Routen werden geladen...', style: TextStyle(fontSize: 12, color: AppColors.lightMuted)),
+              ],
+            ),
+          );
+        }
 
-    if (allTransports.isEmpty) return const SizedBox.shrink();
+        final allTransports = snapshot.data ?? [];
+        allTransports.sort((a, b) => a.departureDate.compareTo(b.departureDate));
 
-    final totalCost = allTransports.fold<int>(0, (sum, t) => sum + t.estimatedCostCents);
+        if (allTransports.isEmpty) return const SizedBox.shrink();
 
-    return SquircleContainer(
-      borderRadius: BorderRadius.circular(24),
-      padding: const EdgeInsets.all(20),
-      backgroundColor: surfaceColor,
-      boxShadow: [BoxShadow(color: shadowColor, blurRadius: 18, offset: const Offset(0, 7))],
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(Icons.train_rounded, color: AppColors.primary, size: 20),
-          const SizedBox(width: 8),
-          Expanded(child: Text('Verbindungen', style: Theme.of(context).textTheme.titleMedium)),
-          Text(_money(totalCost), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary)),
-        ]),
-        const SizedBox(height: 14),
-        ...allTransports.map((t) => _transportTile(context, t, missingRoutes.any((m) => m.id == t.id))),
-      ]),
+        final totalCost = allTransports.fold<int>(0, (sum, t) => sum + t.estimatedCostCents);
+
+        return SquircleContainer(
+          borderRadius: BorderRadius.circular(24),
+          padding: const EdgeInsets.all(20),
+          backgroundColor: surfaceColor,
+          boxShadow: [BoxShadow(color: shadowColor, blurRadius: 18, offset: const Offset(0, 7))],
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.train_rounded, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Verbindungen', style: Theme.of(context).textTheme.titleMedium)),
+              Text(CurrencyUtils.formatCents(totalCost), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary)),
+            ]),
+            const SizedBox(height: 14),
+            ...allTransports.map((t) => _transportTile(context, t, !widget.trip.transports.any((et) => et.id == t.id))),
+          ]),
+        );
+      },
     );
   }
 
   Widget _transportTile(BuildContext context, TripTransport t, bool isAutoGenerated) {
-    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
-    return Container(
+    final mutedColor = widget.isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    return GestureDetector(
+      onTap: () => _editTransport(t, isAutoGenerated),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface2 : const Color(0xFFF8F9FC),
+        color: widget.isDark ? AppColors.darkSurface2 : const Color(0xFFF8F9FC),
         borderRadius: BorderRadius.circular(14),
         border: isAutoGenerated ? Border.all(color: AppColors.amber.withValues(alpha: .3), width: 1) : null,
       ),
@@ -73,10 +127,10 @@ class TripTransportSection extends StatelessWidget {
             child: Icon(t.mode.icon, size: 18, color: t.mode.color),
           ),
           const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('${t.fromLocation} → ${t.toLocation}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
             Row(children: [
-              Text(t.mode.label, style: TextStyle(fontSize: 11, color: t.mode.color, fontWeight: FontWeight.w600)),
+              Text(RouteService.getTransportLabel(t.mode, widget.trip), style: TextStyle(fontSize: 11, color: t.mode.color, fontWeight: FontWeight.w600)),
               if (t.durationMinutes != null) ...[
                 Text(' · ', style: TextStyle(fontSize: 11, color: mutedColor)),
                 Text(RouteService.formatDuration(t.durationMinutes!), style: TextStyle(fontSize: 11, color: mutedColor)),
@@ -89,9 +143,20 @@ class TripTransportSection extends StatelessWidget {
                   child: const Text('Auto', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.amber)),
                 ),
               ],
+              if (!isAutoGenerated) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(color: AppColors.green.withValues(alpha: .12), borderRadius: BorderRadius.circular(6)),
+                  child: const Text('Manuell', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.green)),
+                ),
+              ],
             ]),
           ])),
-          Text(_money(t.estimatedCostCents), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(CurrencyUtils.formatCents(t.estimatedCostCents), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+            Text('tippen zum Bearbeiten', style: TextStyle(fontSize: 8, color: mutedColor)),
+          ]),
           if (t.isBooked) ...[
             const SizedBox(width: 6),
             const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.green),
@@ -129,18 +194,15 @@ class TripTransportSection extends StatelessWidget {
               launchUrl(Uri.parse(links.omioUrl!));
             }),
           ] else ...[
-            _bookingChip(context, 'DB', Icons.train_rounded, AppColors.primary, () {
-              final links = BookingService.getLinks(transport: t);
-              launchUrl(Uri.parse(links.dbUrl!));
+            _bookingChip(context, 'Google Maps', Icons.map_outlined, AppColors.green, () {
+              launchUrl(Uri.parse(BookingService.getGoogleMapsLink(t.fromLocation, t.toLocation)));
             }),
             const SizedBox(width: 6),
-            _bookingChip(context, 'Omio', Icons.directions_bus_rounded, AppColors.amber, () {
-              final links = BookingService.getLinks(transport: t);
-              launchUrl(Uri.parse(links.omioUrl!));
-            }),
+            ..._buildTrainBookingChips(context, t),
           ],
         ]),
       ]),
+      ),
     );
   }
 
@@ -163,5 +225,49 @@ class TripTransportSection extends StatelessWidget {
     );
   }
 
-  String _money(int cents) => '${(cents / 100).toStringAsFixed(0)} €';
+  List<Widget> _buildTrainBookingChips(BuildContext context, TripTransport t) {
+    final links = BookingService.getLinks(transport: t);
+    final chips = <Widget>[];
+
+    if (links.jrCentralUrl != null) {
+      chips.add(_bookingChip(context, 'JR Central', Icons.train_rounded, AppColors.primary, () {
+        launchUrl(Uri.parse(links.jrCentralUrl!));
+      }));
+      chips.add(const SizedBox(width: 6));
+      chips.add(_bookingChip(context, 'JR Pass', Icons.confirmation_number_rounded, AppColors.amber, () {
+        launchUrl(Uri.parse(links.jrPassUrl!));
+      }));
+      chips.add(const SizedBox(width: 6));
+      chips.add(_bookingChip(context, 'Hyperdia', Icons.schedule_rounded, AppColors.green, () {
+        launchUrl(Uri.parse(links.hyperdiaUrl!));
+      }));
+    } else {
+      if (links.dbUrl != null) {
+        chips.add(_bookingChip(context, 'DB', Icons.train_rounded, AppColors.primary, () {
+          launchUrl(Uri.parse(links.dbUrl!));
+        }));
+        chips.add(const SizedBox(width: 6));
+      }
+      chips.add(_bookingChip(context, 'Omio', Icons.directions_bus_rounded, AppColors.amber, () {
+        launchUrl(Uri.parse(links.omioUrl!));
+      }));
+    }
+
+    return chips;
+  }
+
+  Future<void> _editTransport(TripTransport transport, bool isAutoGenerated) async {
+    final updated = await showTransportEditor(context, transport, isDark: widget.isDark);
+    if (updated == null) return;
+
+    List<TripTransport> newTransports;
+    if (isAutoGenerated) {
+      newTransports = [...widget.trip.transports, updated];
+    } else {
+      newTransports = widget.trip.transports.map((t) => t.id == transport.id ? updated : t).toList();
+    }
+
+    final updatedTrip = widget.trip.copyWith(transports: newTransports);
+    await widget.onChanged(updatedTrip);
+  }
 }

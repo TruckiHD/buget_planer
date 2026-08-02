@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/projection_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/currency_utils.dart';
 
 class CategoryDonutChart extends StatelessWidget {
   final List<CategorySpending> data;
@@ -56,7 +57,7 @@ class CategoryDonutChart extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(e.category.label, style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkSecondary : AppColors.lightSecondary)),
                   const SizedBox(width: 4),
-                  Text(_money(e.spentCents), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                  Text(CurrencyUtils.formatCents(e.spentCents), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                 ],
               ),
             )).toList(),
@@ -66,5 +67,4 @@ class CategoryDonutChart extends StatelessWidget {
     );
   }
 
-  String _money(int cents) => '${(cents / 100).toStringAsFixed(0)} €';
 }

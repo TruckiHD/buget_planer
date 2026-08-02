@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../models/finance_models.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/currency_utils.dart';
+import '../../utils/theme_extensions.dart';
 
 Future<TripExpense?> showExpenseEditor(BuildContext context, TripPlan trip, {TripExpense? existing}) async {
   return showModalBottomSheet<TripExpense>(
@@ -67,7 +69,7 @@ class _ExpenseEditorSheetState extends State<_ExpenseEditorSheet> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: _existing?.title ?? '');
-    _amountController = TextEditingController(text: _existing == null ? '' : _euros(_existing!.amountCents));
+    _amountController = TextEditingController(text: _existing == null ? '' : CurrencyUtils.formatCentsInput(_existing!.amountCents));
     _categoryController = TextEditingController(text: _existing?.category ?? 'Transport');
     _attractionTypeController = TextEditingController(text: _existing?.attractionType ?? '');
     _date = _existing?.date ?? widget.trip.startsOn;
@@ -161,7 +163,7 @@ class _ExpenseEditorSheetState extends State<_ExpenseEditorSheet> {
           OutlinedButton.icon(
             onPressed: _pickDate,
             icon: const Icon(Icons.event_outlined, size: 18),
-            label: Text('Geplant für ${_dateLabel(_date)}'),
+            label: Text('Geplant für ${_date.shortDate}'),
           ),
           const SizedBox(height: 10),
           Material(color: Colors.transparent, child: SwitchListTile(
@@ -196,7 +198,7 @@ class _ExpenseEditorSheetState extends State<_ExpenseEditorSheet> {
   }
 
   void _save() {
-    final amount = _parseAmount(_amountController.text);
+    final amount = CurrencyUtils.parseCents(_amountController.text);
     if (_titleController.text.trim().isEmpty || amount <= 0) return;
     final expense = TripExpense(
       id: _existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
@@ -211,8 +213,4 @@ class _ExpenseEditorSheetState extends State<_ExpenseEditorSheet> {
     );
     Navigator.pop(context, expense);
   }
-
-  String _euros(int cents) => (cents / 100).toStringAsFixed(2);
-  int _parseAmount(String value) => ((double.tryParse(value.replaceAll(',', '.')) ?? 0) * 100).round();
-  String _dateLabel(DateTime date) => '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
 }

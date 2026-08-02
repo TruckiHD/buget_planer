@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/finance_models.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/currency_utils.dart';
 
 class TripSegmentTile extends StatelessWidget {
   final TripSegment segment;
@@ -104,7 +105,7 @@ class TripSegmentTile extends StatelessWidget {
             if (segment.baseTransportCostCents > 0) _miniStat('Ausflüge', segment.baseTransportCostCents, const Color(0xFF00B8D9)),
             if (segment.otherCostCents > 0) _miniStat('Sonstiges', segment.otherCostCents, const Color(0xFF00B8D9)),
             const Spacer(),
-            Text(_money(totalSegmentCost), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+            Text(CurrencyUtils.formatCents(totalSegmentCost), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
           ]),
           if (totalSegmentCost > 0) ...[
             const SizedBox(height: 8),
@@ -134,10 +135,9 @@ class TripSegmentTile extends StatelessWidget {
       padding: const EdgeInsets.only(right: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(label, style: TextStyle(fontSize: 10, color: color.withValues(alpha: .7))),
-        Text(_money(cents), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+        Text(CurrencyUtils.formatCents(cents), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
       ]),
     );
   }
 
-  String _money(int cents) => '${(cents / 100).toStringAsFixed(0)} €';
 }

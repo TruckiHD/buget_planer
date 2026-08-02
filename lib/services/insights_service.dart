@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/finance_models.dart';
 import '../services/projection_service.dart';
 import '../utils/app_theme.dart';
+import '../utils/currency_utils.dart';
 
 enum InsightType { warning, success, info, tip }
 
@@ -60,7 +61,7 @@ class InsightsService {
           : 0;
       insights.add(Insight(
         title: 'Solide Sparquote',
-        description: 'Du sparst ${(rate * 100).round()}% deines Einkommens. ${_money(monthlySaving)} bleiben monatlich übrig.',
+        description: 'Du sparst ${(rate * 100).round()}% deines Einkommens. ${CurrencyUtils.formatCents(monthlySaving)} bleiben monatlich übrig.',
         icon: Icons.trending_up_rounded,
         color: AppColors.primary,
         type: InsightType.info,
@@ -77,7 +78,7 @@ class InsightsService {
       final deficit = review.totalExpensesCents - review.totalIncomeCents;
       insights.add(Insight(
         title: 'Ausgaben übersteigen Einnahmen',
-        description: 'Du gibst ${_money(deficit)} mehr aus, als du einnimmst. Zeit, Ausgaben zu priorisieren!',
+        description: 'Du gibst ${CurrencyUtils.formatCents(deficit)} mehr aus, als du einnimmst. Zeit, Ausgaben zu priorisieren!',
         icon: Icons.warning_amber_rounded,
         color: AppColors.red,
         type: InsightType.warning,
@@ -91,7 +92,7 @@ class InsightsService {
       if (cat.isOverBudget) {
         insights.add(Insight(
           title: '${cat.category.label}-Budget überschritten',
-          description: 'Du hast ${_money(cat.spentCents)} von ${_money(cat.budgetLimitCents!)} ausgegeben.',
+          description: 'Du hast ${CurrencyUtils.formatCents(cat.spentCents)} von ${CurrencyUtils.formatCents(cat.budgetLimitCents!)} ausgegeben.',
           icon: cat.category.icon,
           color: AppColors.red,
           type: InsightType.warning,
@@ -116,7 +117,7 @@ class InsightsService {
       if (!forecast.isOnTrack) {
         insights.add(Insight(
           title: '"${trip.name}" braucht mehr Sparen',
-          description: 'Du brauchst ${_money(forecast.requiredMonthlySavingCents)} pro Monat, um genug zu haben.',
+          description: 'Du brauchst ${CurrencyUtils.formatCents(forecast.requiredMonthlySavingCents)} pro Monat, um genug zu haben.',
           icon: Icons.flight_takeoff_rounded,
           color: AppColors.amber,
           type: InsightType.warning,
@@ -124,7 +125,7 @@ class InsightsService {
       } else if (daysUntil <= 30) {
         insights.add(Insight(
           title: '"${trip.name}" startet in $daysUntil Tagen!',
-          description: 'Alles auf Kurs. Du hast ${_money(forecast.availableOnTripCents)} Puffer.',
+          description: 'Alles auf Kurs. Du hast ${CurrencyUtils.formatCents(forecast.availableOnTripCents)} Puffer.',
           icon: Icons.flight_takeoff_rounded,
           color: AppColors.green,
           type: InsightType.success,
@@ -146,7 +147,7 @@ class InsightsService {
       } else if (goal.progress >= 0.8) {
         insights.add(Insight(
           title: '"${goal.name}" fast geschafft!',
-          description: '${(goal.progress * 100).round()}% erreicht. Noch ${_money(goal.remainingCents)} bis zum Ziel.',
+          description: '${(goal.progress * 100).round()}% erreicht. Noch ${CurrencyUtils.formatCents(goal.remainingCents)} bis zum Ziel.',
           icon: Icons.flag_rounded,
           color: AppColors.green,
           type: InsightType.success,
@@ -158,7 +159,7 @@ class InsightsService {
           if (needed > goal.monthlyAllocationCents) {
             insights.add(Insight(
               title: '"${goal.name}" braucht mehr Tempo',
-              description: 'Für das Ziel bräuchtest du ${_money(needed)}/Monat, aber du zahlst nur ${_money(goal.monthlyAllocationCents)}.',
+              description: 'Für das Ziel bräuchtest du ${CurrencyUtils.formatCents(needed)}/Monat, aber du zahlst nur ${CurrencyUtils.formatCents(goal.monthlyAllocationCents)}.',
               icon: Icons.flag_rounded,
               color: AppColors.amber,
               type: InsightType.tip,
@@ -222,7 +223,7 @@ class InsightsService {
     if (percent > 20) {
       insights.add(Insight(
         title: 'Ausgaben gestiegen',
-        description: 'Du gibst diesen Monat ${_money(diff)} mehr aus als letzten Monat (+$percent%).',
+        description: 'Du gibst diesen Monat ${CurrencyUtils.formatCents(diff)} mehr aus als letzten Monat (+$percent%).',
         icon: Icons.trending_up_rounded,
         color: AppColors.amber,
         type: InsightType.info,
@@ -230,13 +231,11 @@ class InsightsService {
     } else if (percent < -20) {
       insights.add(Insight(
         title: 'Ausgaben gesunken',
-        description: 'Du sparst diesen Monat ${_money(-diff)} im Vergleich zu letzten Monat (-${percent.abs()}%).',
+        description: 'Du sparst diesen Monat ${CurrencyUtils.formatCents(-diff)} im Vergleich zu letzten Monat (-${percent.abs()}%).',
         icon: Icons.trending_down_rounded,
         color: AppColors.green,
         type: InsightType.success,
       ));
     }
   }
-
-  static String _money(int cents) => '${cents < 0 ? '-' : ''}${(cents.abs() / 100).toStringAsFixed(0)} €';
 }

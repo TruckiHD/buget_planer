@@ -4,10 +4,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../app/budget_planner_app.dart';
 import '../data/local_storage_service.dart';
 import '../models/finance_models.dart';
-import '../services/export_service.dart';
 import '../services/insights_service.dart';
 import '../services/projection_service.dart';
+import '../utils/currency_utils.dart';
+import '../utils/theme_extensions.dart';
 import 'onboarding_screen.dart';
+import 'cashflow_entry_screen.dart';
+import 'planned_purchase_screen.dart';
+import 'recurring_transaction_screen.dart';
+import 'savings_goal_screen.dart';
+import 'settings_screen.dart';
 import 'trip_detail_screen.dart';
 import '../utils/app_theme.dart';
 import '../utils/squircle_container.dart';
@@ -15,6 +21,7 @@ import '../widgets/charts/balance_line_chart.dart';
 import '../widgets/charts/category_donut_chart.dart';
 import '../widgets/charts/year_review_chart.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/shared/animated_counter.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -127,9 +134,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _setupCard(),
                 const SizedBox(height: 18),
               ],
+              _heroBalanceCard(),
+              const SizedBox(height: 16),
+              _quickActionsRow(),
+              const SizedBox(height: 20),
               _insightsSection(),
               const SizedBox(height: 22),
-              _responsiveOverview(desktop),
+              _twoColumnOverview(desktop),
               const SizedBox(height: 22),
               _sectionTitle('Dein Monat', 'Was bleibt nach den festen Plänen?'),
               const SizedBox(height: 12),
@@ -197,67 +208,180 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _setupCard() => _surface(child: Row(children: [Container(width: 44, height: 44, decoration: BoxDecoration(color: _chipBgColor, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.waving_hand_outlined, color: AppColors.primary)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Richte deinen Finanzblick ein', style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 3), Text('Trage Guthaben, Reserve und dein monatliches Plus ein. Danach werden deine Prognosen aussagekräftig.', style: Theme.of(context).textTheme.bodyMedium)])), TextButton(onPressed: _showSettings, child: const Text('Starten'))]));
 
-  Widget _responsiveOverview(bool desktop) {
-    final cards = [_balanceCard(), _monthlyPlusCard(), _tripReadinessCard()];
-    if (!desktop) return Column(children: cards.map((card) => Padding(padding: const EdgeInsets.only(bottom: 12), child: card)).toList());
-    // The dashboard lives inside a vertical scroll view. Stretching children
-    // there asks the Row for an infinite height, so let each card keep its
-    // intrinsic height instead.
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [for (var i = 0; i < cards.length; i++) Expanded(child: Padding(padding: EdgeInsets.only(right: i == 2 ? 0 : 12), child: cards[i]))]);
-  }
-
-  Widget _balanceCard() {
+  Widget _heroBalanceCard() {
     final balance = _profile.currentBalanceCents;
     final free = _profile.freeBalanceCents;
     final reserve = _profile.safetyReserveCents;
     final reserved = _profile.reservedTripCents + _profile.reservedGoalCents + _profile.reservedPurchaseCents;
+    final totalReserved = reserved + reserve;
+    final freePercent = balance > 0 ? (free / balance).clamp(0.0, 1.0) : 0.0;
+
     return _surface(
       gradient: const LinearGradient(colors: [Color(0xFF5669E8), Color(0xFF8290F8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _cardLabel('GUTHABEN HEUTE', Colors.white70),
+        Row(
+          children: [
+            _cardLabel('GUTHABEN HEUTE', Colors.white70),
+            const Spacer(),
+            Icon(Icons.account_balance_wallet_outlined, color: Colors.white.withValues(alpha: 0.6), size: 20),
+          ],
+        ),
         const SizedBox(height: 12),
-        Text(_money(balance), style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1)),
-        const SizedBox(height: 4),
-        Text('Tatsächliches Guthaben, nicht nur der freie Anteil', style: const TextStyle(color: Colors.white70)),
-        const SizedBox(height: 18),
-        Row(children: [const Icon(Icons.account_balance_wallet_outlined, color: Colors.white70, size: 16), const SizedBox(width: 6), Text('Frei nach allen Plänen ${_money(free)}', style: const TextStyle(color: Colors.white70, fontSize: 12))]),
+        AnimatedCounter(
+          targetCents: balance,
+          style: const TextStyle(color: Colors.white, fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -1.5),
+        ),
         const SizedBox(height: 6),
-        Row(children: [const Icon(Icons.lock_outline_rounded, color: Colors.white70, size: 16), const SizedBox(width: 6), Text('Reserviert ${_money(reserved)} · Reserve ${_money(reserve)}', style: const TextStyle(color: Colors.white70, fontSize: 12))]),
+        Text('Tatsächliches Guthaben, nicht nur der freie Anteil', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13)),
+        const SizedBox(height: 20),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: freePercent.toDouble(),
+            minHeight: 6,
+            backgroundColor: Colors.white.withValues(alpha: 0.2),
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Icon(Icons.check_circle_outline_rounded, color: Colors.white.withValues(alpha: 0.8), size: 16),
+            const SizedBox(width: 6),
+            Text('Frei ${CurrencyUtils.formatCents(free)}', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13, fontWeight: FontWeight.w600)),
+            const Spacer(),
+            Icon(Icons.lock_outline_rounded, color: Colors.white.withValues(alpha: 0.6), size: 16),
+            const SizedBox(width: 6),
+            Text('Reserviert ${CurrencyUtils.formatCents(totalReserved)}', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12)),
+          ],
+        ),
       ]),
     );
   }
 
-  Widget _monthlyPlusCard() {
-    final surplus = _profile.monthlySurplusCents;
-    return _surface(
+  Widget _quickActionsRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: _quickAction(
+            icon: Icons.arrow_downward_rounded,
+            label: 'Ausgabe',
+            color: AppColors.red,
+            onTap: () => _showAddCashflow(),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _quickAction(
+            icon: Icons.arrow_upward_rounded,
+            label: 'Einnahme',
+            color: AppColors.green,
+            onTap: () => _showAddCashflow(),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _quickAction(
+            icon: Icons.settings_outlined,
+            label: 'Profil',
+            color: AppColors.primary,
+            onTap: _showSettings,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _quickAction({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: _surface(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 20, color: color),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isDark ? AppColors.darkText : AppColors.lightText,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _twoColumnOverview(bool desktop) {
+    final monthlyPlus = _profile.monthlySurplusCents;
+    final sortedTrips = [..._profile.trips]..sort((a, b) => a.startsOn.compareTo(b.startsOn));
+    final nextTrip = sortedTrips.where((t) => t.startsOn.isAfter(DateTime.now())).isEmpty
+        ? sortedTrips.lastOrNull
+        : sortedTrips.firstWhere((t) => t.startsOn.isAfter(DateTime.now()));
+    final daysUntil = nextTrip != null ? nextTrip.startsOn.difference(DateTime.now()).inDays : 0;
+
+    final monthlyCard = _surface(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _cardLabel('MONATLICHER ÜBERSCHUSS', _mutedColor),
+        _cardLabel('MONATLICHES PLUS', _mutedColor),
         const SizedBox(height: 12),
-        Text(_money(surplus), style: TextStyle(color: surplus >= 0 ? AppColors.green : AppColors.red, fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1)),
+        Text(CurrencyUtils.formatCents(monthlyPlus), style: TextStyle(color: monthlyPlus >= 0 ? AppColors.green : AppColors.red, fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -1)),
         const SizedBox(height: 4),
-        Text('nach Fixkosten & Alltag', style: TextStyle(color: _mutedColor)),
-        const SizedBox(height: 18),
-        Row(children: [const Icon(Icons.trending_up_rounded, color: AppColors.green, size: 18), const SizedBox(width: 5), Text('${_money(_profile.monthlyIncomeCents)} Einnahmen / Monat', style: TextStyle(fontSize: 12, color: _mutedColor))]),
+        Text('nach Fixkosten & Alltag', style: TextStyle(color: _mutedColor, fontSize: 13)),
+        const SizedBox(height: 14),
+        Row(children: [Icon(Icons.trending_up_rounded, color: AppColors.green, size: 16), const SizedBox(width: 5), Text('${CurrencyUtils.formatCents(_profile.monthlyIncomeCents)}/Monat', style: TextStyle(fontSize: 12, color: _mutedColor))]),
       ]),
     );
-  }
 
-  Widget _tripReadinessCard() {
-    if (_profile.trips.isEmpty) {
-      return _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('NOCH KEINE REISE', style: TextStyle(fontSize: 11, letterSpacing: 1.1, fontWeight: FontWeight.w800, color: _mutedColor)), const SizedBox(height: 12), Text('Lege eine Reise an, um den Reisetag zu prognostizieren.', style: TextStyle(color: _mutedColor))]));
+    final tripCard = _surface(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _cardLabel('NÄCHSTE REISE', _mutedColor),
+        const SizedBox(height: 12),
+        if (nextTrip != null) ...[
+          Text(nextTrip.destination.isNotEmpty ? nextTrip.destination : nextTrip.name, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _textColor, letterSpacing: -0.5)),
+          const SizedBox(height: 4),
+          Text('$daysUntil Tage', style: TextStyle(fontSize: 13, color: _mutedColor)),
+        ] else ...[
+          Text('Keine Reise', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _mutedColor)),
+          const SizedBox(height: 4),
+          Text('Plane dein erstes Ziel', style: TextStyle(fontSize: 13, color: _mutedColor)),
+        ],
+      ]),
+    );
+
+    if (!desktop) {
+      return Column(
+        children: [
+          monthlyCard,
+          const SizedBox(height: 12),
+          tripCard,
+        ],
+      );
     }
-    final trip = _profile.trips.first;
-    final forecast = ProjectionService.forecastTrip(_profile, trip, scenario: _scenario);
-    return _surface(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _cardLabel('AM REISETAG', _mutedColor),
-        const SizedBox(height: 12),
-        Text(_money(forecast.availableOnTripCents), style: TextStyle(color: forecast.isOnTrack ? AppColors.green : AppColors.red, fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1)),
-        const SizedBox(height: 4),
-        Text(forecast.isOnTrack ? 'Puffer nach Reisebudget' : 'Es fehlen noch ${_money(-forecast.availableOnTripCents)}', style: TextStyle(color: _mutedColor)),
-        const SizedBox(height: 18),
-        Text('Tagesbudget ${_money(trip.dailyBudgetCents)}', style: TextStyle(fontSize: 12, color: _mutedColor)),
-      ]),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: monthlyCard),
+        const SizedBox(width: 12),
+        Expanded(child: tripCard),
+      ],
     );
   }
 
@@ -365,7 +489,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Icon(e.category.icon, size: 16, color: e.category.color),
               const SizedBox(width: 8),
               Expanded(child: Text(e.category.label, style: const TextStyle(fontWeight: FontWeight.w500))),
-              Text(_money(e.spentCents), style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(CurrencyUtils.formatCents(e.spentCents), style: const TextStyle(fontWeight: FontWeight.w700)),
               if (e.budgetLimitCents != null && e.budgetLimitCents! > 0) ...[
                 const SizedBox(width: 8),
                 Container(
@@ -399,8 +523,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         Row(
           children: [
-            Expanded(child: _miniStat('Einnahmen', _money(review.totalIncomeCents), AppColors.green)),
-            Expanded(child: _miniStat('Ausgaben', _money(review.totalExpensesCents), AppColors.red)),
+            Expanded(child: _miniStat('Einnahmen', CurrencyUtils.formatCents(review.totalIncomeCents), AppColors.green)),
+            Expanded(child: _miniStat('Ausgaben', CurrencyUtils.formatCents(review.totalExpensesCents), AppColors.red)),
             Expanded(child: _miniStat('Sparquote', '${review.savingRatePercent}%', review.savingRatePercent >= 20 ? AppColors.green : AppColors.amber)),
           ],
         ),
@@ -415,7 +539,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 const Icon(Icons.emoji_events_rounded, color: AppColors.amber, size: 20),
                 const SizedBox(width: 8),
-                Expanded(child: Text('Bester Sparmonat: ${monthNames[review.bestSavingMonth - 1]} mit ${_money(review.bestSavingCents)} Überschuss', style: const TextStyle(fontSize: 13))),
+                Expanded(child: Text('Bester Sparmonat: ${monthNames[review.bestSavingMonth - 1]} mit ${CurrencyUtils.formatCents(review.bestSavingCents)} Überschuss', style: const TextStyle(fontSize: 13))),
               ],
             ),
           ),
@@ -455,7 +579,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [IconButton(tooltip: 'Vorheriger Monat', onPressed: () => setState(() => _dashboardMonth = DateTime(_dashboardMonth.year, _dashboardMonth.month - 1)), icon: const Icon(Icons.chevron_left_rounded)), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [Text(_monthLabel(_dashboardMonth), style: Theme.of(context).textTheme.titleMedium), Text(isCurrentMonth ? 'Aktueller Monat' : 'Prognose', style: Theme.of(context).textTheme.bodyMedium)])), IconButton(tooltip: 'Nächster Monat', onPressed: () => setState(() => _dashboardMonth = DateTime(_dashboardMonth.year, _dashboardMonth.month + 1)), icon: const Icon(Icons.chevron_right_rounded))]),
       const SizedBox(height: 14),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Voraussichtlich am Monatsende'), Text(_money(snapshot.projectedClosingBalanceCents), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _textColor))]),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Voraussichtlich am Monatsende'), Text(CurrencyUtils.formatCents(snapshot.projectedClosingBalanceCents), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _textColor))]),
       const SizedBox(height: 12),
       _flowLine('Einnahmen', snapshot.incomeCents, const Color(0xFF20966A), Icons.arrow_downward_rounded),
       _flowLine('Fixkosten & Alltag', -(snapshot.fixedExpensesCents + snapshot.variableExpensesCents), const Color(0xFFD94E5A), Icons.arrow_upward_rounded),
@@ -468,7 +592,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _flowLine(String label, int amount, Color color, IconData icon, {bool bold = false}) {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [Container(width: 30, height: 30, decoration: BoxDecoration(color: color.withValues(alpha: .11), shape: BoxShape.circle), child: Icon(icon, size: 16, color: color)), const SizedBox(width: 12), Expanded(child: Text(label, style: TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.w500))), Text(_money(amount), style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.w600, color: amount < 0 ? AppColors.red : _textColor))]));
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [Container(width: 30, height: 30, decoration: BoxDecoration(color: color.withValues(alpha: .11), shape: BoxShape.circle), child: Icon(icon, size: 16, color: color)), const SizedBox(width: 12), Expanded(child: Text(label, style: TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.w500))), Text(CurrencyUtils.formatCents(amount), style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.w600, color: amount < 0 ? AppColors.red : _textColor))]));
   }
 
 
@@ -481,7 +605,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Wrap(spacing: 8, runSpacing: 8, children: [for (final scenario in ForecastScenario.values) ChoiceChip(label: Text(_scenarioName(scenario)), selected: _scenario == scenario, onSelected: (_) => setState(() => _scenario = scenario))]),
       const SizedBox(height: 20),
-      Row(crossAxisAlignment: CrossAxisAlignment.end, children: [for (var i = 0; i < values.length; i++) Expanded(child: Column(children: [AnimatedContainer(duration: const Duration(milliseconds: 350), height: 30 + (values[i].clamp(0, 250000).toDouble() / 250000 * 90), width: 34, decoration: BoxDecoration(color: i == _scenario.index ? AppColors.primary : _chipBgColor, borderRadius: BorderRadius.circular(10))), const SizedBox(height: 8), Text(_money(values[i]), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)), const SizedBox(height: 3), Text(_scenarioShort(ForecastScenario.values[i]), style: TextStyle(fontSize: 11, color: _mutedColor))]))]),
+      Row(crossAxisAlignment: CrossAxisAlignment.end, children: [for (var i = 0; i < values.length; i++) Expanded(child: Column(children: [AnimatedContainer(duration: const Duration(milliseconds: 350), height: 30 + (values[i].clamp(0, 250000).toDouble() / 250000 * 90), width: 34, decoration: BoxDecoration(color: i == _scenario.index ? AppColors.primary : _chipBgColor, borderRadius: BorderRadius.circular(10))), const SizedBox(height: 8), Text(CurrencyUtils.formatCents(values[i]), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)), const SizedBox(height: 3), Text(_scenarioShort(ForecastScenario.values[i]), style: TextStyle(fontSize: 11, color: _mutedColor))]))]),
     ]));
   }
 
@@ -535,15 +659,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _cardLabel('GESAMTKOSTEN', _mutedColor),
         const SizedBox(height: 8),
-        Text(_money(totalCost), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
+        Text(CurrencyUtils.formatCents(totalCost), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
         const SizedBox(height: 4),
-        Text('${_money(totalPaid)} bezahlt', style: TextStyle(fontSize: 12, color: AppColors.green)),
+        Text('${CurrencyUtils.formatCents(totalPaid)} bezahlt', style: TextStyle(fontSize: 12, color: AppColors.green)),
       ]))),
       const SizedBox(width: 12),
       Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _cardLabel('NÄCHSTE REISE', _mutedColor),
         const SizedBox(height: 8),
-        Text(nextTrip != null ? _shortDate(nextTrip.startsOn) : '–', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.primary)),
+        Text(nextTrip != null ? nextTrip.startsOn.shortDate : '–', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.primary)),
         const SizedBox(height: 4),
         Text(nextTrip?.name ?? 'Keine', style: TextStyle(fontSize: 12, color: _mutedColor), overflow: TextOverflow.ellipsis),
       ]))),
@@ -636,7 +760,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(width: 12),
                     Icon(Icons.calendar_today_rounded, size: 14, color: _mutedColor),
                     const SizedBox(width: 4),
-                    Text('${_shortDate(trip.startsOn)} – ${_shortDate(trip.endsOn)}', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                    Text('${trip.startsOn.shortDate} – ${trip.endsOn.shortDate}', style: TextStyle(fontSize: 13, color: _mutedColor)),
                     const SizedBox(width: 12),
                     Icon(Icons.schedule_rounded, size: 14, color: _mutedColor),
                     const SizedBox(width: 4),
@@ -647,7 +771,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                         Text('Budget', style: TextStyle(fontSize: 12, color: _mutedColor)),
-                        Text(_money(trip.totalCostCents), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                        Text(CurrencyUtils.formatCents(trip.totalCostCents), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                       ]),
                       const SizedBox(height: 6),
                       ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(value: costProgress, minHeight: 6, backgroundColor: _dividerColor, color: trip.isOverBudget ? AppColors.red : AppColors.primary)),
@@ -656,7 +780,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                         Text('Finanziert', style: TextStyle(fontSize: 12, color: _mutedColor)),
-                        Text(_money(trip.paidCents), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.green)),
+                        Text(CurrencyUtils.formatCents(trip.paidCents), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.green)),
                       ]),
                       const SizedBox(height: 6),
                       ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(value: fundingProgress, minHeight: 6, backgroundColor: _dividerColor, color: AppColors.green)),
@@ -669,8 +793,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(width: 6),
                       Text(
                         trip.isOverBudget
-                            ? '${_money(-trip.budgetRemainingCents)} über Limit'
-                            : '${_money(trip.budgetRemainingCents)} im Limit',
+                            ? '${CurrencyUtils.formatCents(-trip.budgetRemainingCents)} über Limit'
+                            : '${CurrencyUtils.formatCents(trip.budgetRemainingCents)} im Limit',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: trip.isOverBudget ? AppColors.red : AppColors.green),
                       ),
                     ]),
@@ -744,10 +868,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _cardLabel('EINNAHMEN', _mutedColor),
         const SizedBox(height: 8),
-        Text(_money(totalIncome), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.green)),
+        Text(CurrencyUtils.formatCents(totalIncome), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.green)),
         const SizedBox(height: 4),
         if (plannedIncome > 0)
-          Text('+${_money(plannedIncome)} geplant', style: TextStyle(fontSize: 12, color: AppColors.amber))
+          Text('+${CurrencyUtils.formatCents(plannedIncome)} geplant', style: TextStyle(fontSize: 12, color: AppColors.amber))
         else
           Text('diesen Monat', style: TextStyle(fontSize: 12, color: _mutedColor)),
       ]))),
@@ -755,10 +879,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _cardLabel('AUSGABEN', _mutedColor),
         const SizedBox(height: 8),
-        Text(_money(totalExpenses), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.red)),
+        Text(CurrencyUtils.formatCents(totalExpenses), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.red)),
         const SizedBox(height: 4),
         if (plannedExpenses > 0)
-          Text('+${_money(plannedExpenses)} geplant', style: TextStyle(fontSize: 12, color: AppColors.amber))
+          Text('+${CurrencyUtils.formatCents(plannedExpenses)} geplant', style: TextStyle(fontSize: 12, color: AppColors.amber))
         else
           Text('diesen Monat', style: TextStyle(fontSize: 12, color: _mutedColor)),
       ]))),
@@ -766,7 +890,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _cardLabel('ÜBERSCHUSS', _mutedColor),
         const SizedBox(height: 8),
-        Text(_money(surplus), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: surplus >= 0 ? AppColors.green : AppColors.red)),
+        Text(CurrencyUtils.formatCents(surplus), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: surplus >= 0 ? AppColors.green : AppColors.red)),
         const SizedBox(height: 4),
         Text('$confirmedEntries/$totalEntries bestätigt', style: TextStyle(fontSize: 12, color: _mutedColor)),
       ]))),
@@ -855,7 +979,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 2),
                     Text('${item.categoryLabel} · ${_frequencyLabel(item.frequency)} · am ${item.dayOfMonth}.', style: TextStyle(fontSize: 12, color: _mutedColor)),
                   ])),
-                  Text('${item.kind == TransactionKind.income ? '+' : '-'}${_money(item.amountCents)}', style: TextStyle(fontWeight: FontWeight.w700, color: item.kind == TransactionKind.income ? AppColors.green : AppColors.red)),
+                  Text('${item.kind == TransactionKind.income ? '+' : '-'}${CurrencyUtils.formatCents(item.amountCents)}', style: TextStyle(fontWeight: FontWeight.w700, color: item.kind == TransactionKind.income ? AppColors.green : AppColors.red)),
                   const SizedBox(width: 4),
                   IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showAddRecurring(item), tooltip: 'Bearbeiten', padding: EdgeInsets.zero, constraints: const BoxConstraints()),
                 ]),
@@ -913,9 +1037,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _cardLabel('GESAMTZIEL', _mutedColor),
         const SizedBox(height: 8),
-        Text(_money(totalTarget), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
+        Text(CurrencyUtils.formatCents(totalTarget), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
         const SizedBox(height: 4),
-        Text('${_money(totalSaved)} gespart', style: TextStyle(fontSize: 12, color: AppColors.green)),
+        Text('${CurrencyUtils.formatCents(totalSaved)} gespart', style: TextStyle(fontSize: 12, color: AppColors.green)),
       ]))),
       const SizedBox(width: 12),
       Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1002,7 +1126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         const SizedBox(width: 8),
                         Icon(Icons.flag_rounded, size: 14, color: _mutedColor),
                         const SizedBox(width: 4),
-                        Text(_shortDate(goal.deadline), style: TextStyle(fontSize: 12, color: _mutedColor)),
+                        Text(goal.deadline.shortDate, style: TextStyle(fontSize: 12, color: _mutedColor)),
                         if (!isReached && daysUntil > 0) ...[
                           const SizedBox(width: 8),
                           Text('in $daysUntil Tagen', style: TextStyle(fontSize: 12, color: _mutedColor)),
@@ -1021,11 +1145,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Text(goal.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textColor)),
                     const SizedBox(height: 4),
                     Row(children: [
-                      Text('Ziel: ${_money(goal.targetCents)}', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                      Text('Ziel: ${CurrencyUtils.formatCents(goal.targetCents)}', style: TextStyle(fontSize: 13, color: _mutedColor)),
                       const SizedBox(width: 16),
-                      Text('${_money(goal.savedCents)} gespart', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.green)),
+                      Text('${CurrencyUtils.formatCents(goal.savedCents)} gespart', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.green)),
                       const SizedBox(width: 16),
-                      Text('${_money(goal.monthlyAllocationCents)}/Monat', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                      Text('${CurrencyUtils.formatCents(goal.monthlyAllocationCents)}/Monat', style: TextStyle(fontSize: 13, color: _mutedColor)),
                     ]),
                     const SizedBox(height: 16),
                     ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: goal.progress, minHeight: 10, color: statusColor, backgroundColor: _dividerColor)),
@@ -1033,7 +1157,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                       Text('${(goal.progress * 100).round()}%', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: statusColor)),
                       if (!isReached && !onTrack)
-                        Text('Bräuchte ${_money(neededPerMonth)}/Monat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.amber)),
+                        Text('Bräuchte ${CurrencyUtils.formatCents(neededPerMonth)}/Monat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.amber)),
                       if (isReached)
                         Text('Geschafft!', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.green)),
                     ]),
@@ -1095,9 +1219,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _cardLabel('GESAMTKOSTEN', _mutedColor),
         const SizedBox(height: 8),
-        Text(_money(totalCost), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
+        Text(CurrencyUtils.formatCents(totalCost), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _textColor)),
         const SizedBox(height: 4),
-        Text('${_money(reservedCost)} reserviert', style: TextStyle(fontSize: 12, color: AppColors.green)),
+        Text('${CurrencyUtils.formatCents(reservedCost)} reserviert', style: TextStyle(fontSize: 12, color: AppColors.green)),
       ]))),
       const SizedBox(width: 12),
       Expanded(child: _surface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1208,13 +1332,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(children: [
                       Icon(Icons.calendar_today_rounded, size: 14, color: _mutedColor),
                       const SizedBox(width: 4),
-                      Text(_shortDate(purchase.desiredDate), style: TextStyle(fontSize: 13, color: _mutedColor)),
+                      Text(purchase.desiredDate.shortDate, style: TextStyle(fontSize: 13, color: _mutedColor)),
                       if (!isPurchased && daysUntil > 0) ...[
                         const SizedBox(width: 8),
                         Text('in $daysUntil Tagen', style: TextStyle(fontSize: 13, color: _mutedColor)),
                       ],
                       const Spacer(),
-                      Text(_money(purchase.amountCents), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textColor)),
+                      Text(CurrencyUtils.formatCents(purchase.amountCents), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textColor)),
                     ]),
                   ],
                 )),
@@ -1253,7 +1377,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(entry.title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: _textColor)),
                 const SizedBox(height: 2),
-                Text('${entry.categoryLabel} · ${_shortDate(entry.date)}', style: TextStyle(fontSize: 12, color: _mutedColor)),
+                Text('${entry.categoryLabel} · ${entry.date.shortDate}', style: TextStyle(fontSize: 12, color: _mutedColor)),
               ])),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1264,7 +1388,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Text(entry.isConfirmed ? 'Bestätigt' : 'Geplant', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: entry.isConfirmed ? AppColors.green : AppColors.amber)),
               ),
               const SizedBox(width: 8),
-              Text('${entry.kind == TransactionKind.income ? '+' : '-'}${_money(entry.amountCents)}', style: TextStyle(fontWeight: FontWeight.w700, color: entry.kind == TransactionKind.income ? AppColors.green : AppColors.red)),
+              Text('${entry.kind == TransactionKind.income ? '+' : '-'}${CurrencyUtils.formatCents(entry.amountCents)}', style: TextStyle(fontWeight: FontWeight.w700, color: entry.kind == TransactionKind.income ? AppColors.green : AppColors.red)),
             ]),
           ),
         ),
@@ -1283,9 +1407,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Color get _chipBgColor => _isDark ? AppColors.darkChipBg : AppColors.lightChipBg;
   Color get _shadowColor => _isDark ? AppColors.darkCardShadow : AppColors.lightCardShadow;
 
-  Widget _surface({required Widget child, Gradient? gradient}) => SquircleContainer(
+  Widget _surface({required Widget child, Gradient? gradient, EdgeInsetsGeometry? padding}) => SquircleContainer(
     borderRadius: BorderRadius.circular(26),
-    padding: const EdgeInsets.all(20),
+    padding: padding ?? const EdgeInsets.all(20),
     backgroundColor: gradient == null ? _surfaceColor : null,
     backgroundGradient: gradient,
     boxShadow: [BoxShadow(color: _shadowColor, blurRadius: 20, offset: const Offset(0, 8))],
@@ -1354,217 +1478,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _showSettings() async {
-    final balanceController = TextEditingController(text: (_profile.currentBalanceCents / 100).toStringAsFixed(2));
-    final reserveController = TextEditingController(text: (_profile.safetyReserveCents / 100).toStringAsFixed(2));
-    final variableController = TextEditingController(text: (_profile.monthlyVariableBudgetCents / 100).toStringAsFixed(2));
-    final budgetControllers = <ExpenseCategory, TextEditingController>{};
-    for (final cat in ExpenseCategory.values) {
-      final existing = _profile.categoryBudgets.where((b) => b.category == cat).isEmpty ? null : _profile.categoryBudgets.firstWhere((b) => b.category == cat);
-      budgetControllers[cat] = TextEditingController(text: existing != null ? _euros(existing.monthlyLimitCents) : '');
-    }
-    final values = await showModalBottomSheet<List<int>>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.viewInsetsOf(context).bottom + 24),
-        child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Finanzprofil', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 6),
-          const Text('Diese Werte bilden die Basis deiner Prognosen.'),
-          const SizedBox(height: 18),
-          TextField(controller: balanceController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Aktuelles Guthaben')),
-          const SizedBox(height: 12),
-          TextField(controller: reserveController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Sicherheitsreserve')),
-          const SizedBox(height: 12),
-          TextField(controller: variableController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Alltagspuffer pro Monat')),
-          const SizedBox(height: 20),
-          const Divider(),
-          const SizedBox(height: 12),
-          Text('Kategorie-Budgets', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 4),
-          const Text('Setze monatliche Limits pro Kategorie. Leer = kein Budget.', style: TextStyle(fontSize: 13, color: Color(0xFF78839A))),
-          const SizedBox(height: 12),
-          ...ExpenseCategory.values.map((cat) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: TextField(
-              controller: budgetControllers[cat],
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                prefixText: '€ ',
-                labelText: cat.label,
-                prefixIcon: Icon(cat.icon, size: 20, color: cat.color),
-              ),
-            ),
-          )),
-          const SizedBox(height: 16),
-          SizedBox(width: double.infinity, child: FilledButton(onPressed: () { final values = [_parseAmount(balanceController.text), _parseAmount(reserveController.text), _parseAmount(variableController.text)]; Navigator.pop(sheetContext, values); }, child: const Text('Profil speichern'))),
-          const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: OutlinedButton.icon(onPressed: () { Navigator.pop(sheetContext); _exportData(); }, icon: const Icon(Icons.upload_rounded, size: 18), label: const Text('Export'))),
-            const SizedBox(width: 12),
-            Expanded(child: OutlinedButton.icon(onPressed: () { Navigator.pop(sheetContext); _importData(); }, icon: const Icon(Icons.download_rounded, size: 18), label: const Text('Import'))),
-          ]),
-        ])),
+    final updated = await Navigator.push<FinancialProfile>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(profile: _profile),
       ),
     );
-    if (values == null) return;
-    final budgets = <CategoryBudget>[];
-    for (final cat in ExpenseCategory.values) {
-      final amount = _parseAmount(budgetControllers[cat]!.text);
-      if (amount > 0) budgets.add(CategoryBudget(category: cat, monthlyLimitCents: amount));
+    if (updated != null) {
+      setState(() => _profile = updated);
+      await _persistProfile();
     }
-    setState(() => _profile = _profile.copyWith(currentBalanceCents: values[0], safetyReserveCents: values[1], monthlyVariableBudgetCents: values[2], categoryBudgets: budgets));
-    await _persistProfile();
-  }
-
-  Future<void> _exportData() async {
-    final json = ExportService.exportToJson(_profile);
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Daten exportieren'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Dein Finanzprofil als JSON. Kopiere den Text und speichere ihn als Datei.'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _isDark ? AppColors.darkSurface2 : const Color(0xFFF5F7FB),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SelectableText(json, style: const TextStyle(fontSize: 11, fontFamily: 'monospace'), maxLines: 10),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Schließen')),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _importData() async {
-    final controller = TextEditingController();
-    final json = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Daten importieren'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Füge den JSON-Text deines gespeicherten Profils ein.'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              maxLines: 8,
-              decoration: const InputDecoration(
-                hintText: 'JSON hier einfügen...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Importieren')),
-        ],
-      ),
-    );
-    if (json == null || json.trim().isEmpty) return;
-    final imported = ExportService.importFromJson(json);
-    if (imported == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ungültiges Format. Bitte prüfe den JSON-Text.')));
-      return;
-    }
-    setState(() => _profile = imported);
-    await _persistProfile();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Daten erfolgreich importiert!')));
   }
 
 
   Future<void> _showAddCashflow() async {
-    final titleController = TextEditingController();
-    final amountController = TextEditingController();
-    var kind = TransactionKind.expense;
-    var confirmed = true;
-    ExpenseCategory expCat = ExpenseCategory.sonstiges;
-    IncomeCategory incCat = IncomeCategory.sonstiges;
-    var selectedDate = DateTime.now();
-    final entry = await showModalBottomSheet<CashFlowEntry>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.viewInsetsOf(context).bottom + 24),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Buchung hinzufügen', style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 18),
-            TextField(controller: titleController, autofocus: true, decoration: const InputDecoration(labelText: 'Titel', hintText: 'z. B. Zugticket', border: OutlineInputBorder())),
-            const SizedBox(height: 12),
-            TextField(controller: amountController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Betrag', border: OutlineInputBorder())),
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: selectedDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-                if (picked != null) setSheetState(() => selectedDate = picked);
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: InputDecorator(
-                decoration: const InputDecoration(labelText: 'Datum', border: OutlineInputBorder(), suffixIcon: Icon(Icons.calendar_today_rounded, size: 20)),
-                child: Text(_shortDate(selectedDate)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => setSheetState(() => selectedDate = DateTime.now()),
-                  icon: const Icon(Icons.today_rounded, size: 18),
-                  label: const Text('Heute'),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<TransactionKind>(initialValue: kind, decoration: const InputDecoration(labelText: 'Art', border: OutlineInputBorder()), items: const [DropdownMenuItem(value: TransactionKind.expense, child: Text('Ausgabe')), DropdownMenuItem(value: TransactionKind.income, child: Text('Einnahme'))], onChanged: (value) => setSheetState(() => kind = value ?? TransactionKind.expense)),
-            const SizedBox(height: 12),
-            if (kind == TransactionKind.expense)
-              DropdownButtonFormField<ExpenseCategory>(
-                initialValue: expCat,
-                decoration: const InputDecoration(labelText: 'Kategorie', border: OutlineInputBorder()),
-                items: ExpenseCategory.values.map((cat) => DropdownMenuItem(
-                  value: cat,
-                  child: Row(children: [Icon(cat.icon, size: 18, color: cat.color), const SizedBox(width: 8), Text(cat.label)]),
-                )).toList(),
-                onChanged: (value) => setSheetState(() => expCat = value ?? ExpenseCategory.sonstiges),
-              )
-            else
-              DropdownButtonFormField<IncomeCategory>(
-                initialValue: incCat,
-                decoration: const InputDecoration(labelText: 'Kategorie', border: OutlineInputBorder()),
-                items: IncomeCategory.values.map((cat) => DropdownMenuItem(
-                  value: cat,
-                  child: Row(children: [Icon(cat.icon, size: 18, color: cat.color), const SizedBox(width: 8), Text(cat.label)]),
-                )).toList(),
-                onChanged: (value) => setSheetState(() => incCat = value ?? IncomeCategory.sonstiges),
-              ),
-            CheckboxListTile(contentPadding: EdgeInsets.zero, value: confirmed, title: const Text('Bereits bestätigt / bezahlt'), onChanged: (value) => setSheetState(() => confirmed = value ?? true)),
-            const SizedBox(height: 8),
-            SizedBox(width: double.infinity, child: FilledButton(onPressed: () { final amount = _parseAmount(amountController.text); if (titleController.text.trim().isEmpty || amount <= 0) return; Navigator.pop(sheetContext, CashFlowEntry(id: DateTime.now().microsecondsSinceEpoch.toString(), title: titleController.text.trim(), amountCents: amount, date: selectedDate, kind: kind, expenseCategory: kind == TransactionKind.expense ? expCat : null, incomeCategory: kind == TransactionKind.income ? incCat : null, isConfirmed: confirmed)); }, child: const Text('Buchung speichern'))),
-          ]),
-        ),
+    final entry = await Navigator.push<CashFlowEntry>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CashflowEntryScreen(),
       ),
     );
     if (entry == null) return;
@@ -1573,50 +1504,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _showAddRecurring([RecurringTransaction? existing]) async {
-    final titleController = TextEditingController(text: existing?.title ?? '');
-    final amountController = TextEditingController(text: existing != null ? _euros(existing.amountCents) : '');
-    var kind = existing?.kind ?? TransactionKind.expense;
-    ExpenseCategory expCat = existing?.expenseCategory ?? ExpenseCategory.sonstiges;
-    IncomeCategory incCat = existing?.incomeCategory ?? IncomeCategory.sonstiges;
-    final item = await showModalBottomSheet<RecurringTransaction>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.viewInsetsOf(context).bottom + 24),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(existing != null ? 'Bewegung bearbeiten' : 'Regelmäßige Bewegung', style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 18),
-            TextField(controller: titleController, autofocus: true, decoration: const InputDecoration(labelText: 'Titel', hintText: 'z. B. Taschengeld oder Abo')),
-            const SizedBox(height: 12),
-            TextField(controller: amountController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Betrag')),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<TransactionKind>(initialValue: kind, decoration: const InputDecoration(labelText: 'Art'), items: const [DropdownMenuItem(value: TransactionKind.expense, child: Text('Ausgabe')), DropdownMenuItem(value: TransactionKind.income, child: Text('Einnahme'))], onChanged: (value) => setSheetState(() => kind = value ?? TransactionKind.expense)),
-            const SizedBox(height: 12),
-            if (kind == TransactionKind.expense)
-              DropdownButtonFormField<ExpenseCategory>(
-                initialValue: expCat,
-                decoration: const InputDecoration(labelText: 'Kategorie'),
-                items: ExpenseCategory.values.map((cat) => DropdownMenuItem(
-                  value: cat,
-                  child: Row(children: [Icon(cat.icon, size: 18, color: cat.color), const SizedBox(width: 8), Text(cat.label)]),
-                )).toList(),
-                onChanged: (value) => setSheetState(() => expCat = value ?? ExpenseCategory.sonstiges),
-              )
-            else
-              DropdownButtonFormField<IncomeCategory>(
-                initialValue: incCat,
-                decoration: const InputDecoration(labelText: 'Kategorie'),
-                items: IncomeCategory.values.map((cat) => DropdownMenuItem(
-                  value: cat,
-                  child: Row(children: [Icon(cat.icon, size: 18, color: cat.color), const SizedBox(width: 8), Text(cat.label)]),
-                )).toList(),
-                onChanged: (value) => setSheetState(() => incCat = value ?? IncomeCategory.sonstiges),
-              ),
-            const SizedBox(height: 16),
-            SizedBox(width: double.infinity, child: FilledButton(onPressed: () { final amount = _parseAmount(amountController.text); if (titleController.text.trim().isEmpty || amount <= 0) return; Navigator.pop(sheetContext, RecurringTransaction(id: existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(), title: titleController.text.trim(), amountCents: amount, kind: kind, expenseCategory: kind == TransactionKind.expense ? expCat : null, incomeCategory: kind == TransactionKind.income ? incCat : null, frequency: existing?.frequency ?? TransactionFrequency.monthly, dayOfMonth: existing?.dayOfMonth ?? 1, startsOn: existing?.startsOn ?? DateTime.now())); }, child: Text(existing != null ? 'Speichern' : 'Speichern'))),
-          ]),
-        ),
+    final item = await Navigator.push<RecurringTransaction>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RecurringTransactionScreen(existing: existing),
       ),
     );
     if (item == null) return;
@@ -1629,45 +1520,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _persistProfile();
   }
 
-  String _euros(int cents) => (cents / 100).toStringAsFixed(2);
-
   Future<void> _showAddPurchase([PlannedPurchase? existing]) async {
-    final titleController = TextEditingController(text: existing?.title ?? '');
-    final amountController = TextEditingController(text: existing != null ? _euros(existing.amountCents) : '');
-    var desiredDate = existing?.desiredDate ?? DateTime.now().add(const Duration(days: 90));
-    var reserveNow = existing?.isReserved ?? false;
-    var category = existing?.category ?? ExpenseCategory.sonstiges;
-    final purchase = await showModalBottomSheet<PlannedPurchase>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.viewInsetsOf(context).bottom + 24),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(existing != null ? 'Anschaffung bearbeiten' : 'Anschaffung planen', style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 6),
-            const Text('Der Kauf fließt in die Zukunftsprognose ein. Heute wird nur dann Geld blockiert, wenn du es ausdrücklich reservierst.'),
-            const SizedBox(height: 18),
-            TextField(controller: titleController, autofocus: true, decoration: const InputDecoration(labelText: 'Was möchtest du kaufen?', hintText: 'z. B. neuer Laptop')),
-            const SizedBox(height: 12),
-            TextField(controller: amountController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Preis')),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<ExpenseCategory>(
-              initialValue: category,
-              decoration: const InputDecoration(labelText: 'Kategorie'),
-              items: ExpenseCategory.values.map((cat) => DropdownMenuItem(
-                value: cat,
-                child: Row(children: [Icon(cat.icon, size: 18, color: cat.color), const SizedBox(width: 8), Text(cat.label)]),
-              )).toList(),
-              onChanged: (value) => setSheetState(() => category = value ?? ExpenseCategory.sonstiges),
-            ),
-            const SizedBox(height: 12),
-            Row(children: [const Icon(Icons.event_outlined, size: 20), const SizedBox(width: 8), Expanded(child: Text('Geplant für ${_shortDate(desiredDate)}')), TextButton(onPressed: () async { final picked = await showDatePicker(context: context, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 3650)), initialDate: desiredDate); if (picked != null) setSheetState(() => desiredDate = picked); }, child: const Text('Ändern'))]),
-            const SizedBox(height: 12),
-            CheckboxListTile(contentPadding: EdgeInsets.zero, value: reserveNow, title: const Text('Betrag jetzt reservieren'), onChanged: (value) => setSheetState(() => reserveNow = value ?? false)),
-            SizedBox(width: double.infinity, child: FilledButton(onPressed: () { final amount = _parseAmount(amountController.text); if (titleController.text.trim().isEmpty || amount <= 0) return; Navigator.pop(sheetContext, PlannedPurchase(id: existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(), title: titleController.text.trim(), category: category, amountCents: amount, desiredDate: desiredDate, isReserved: reserveNow, isPurchased: existing?.isPurchased ?? false)); }, child: Text(existing != null ? 'Speichern' : 'Anschaffung speichern'))),
-          ]),
-        ),
+    final purchase = await Navigator.push<PlannedPurchase>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PlannedPurchaseScreen(existing: existing),
       ),
     );
     if (purchase == null) return;
@@ -1681,29 +1538,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _showAddGoal([SavingsGoal? existing]) async {
-    final nameController = TextEditingController(text: existing?.name ?? '');
-    final targetController = TextEditingController(text: existing != null ? _euros(existing.targetCents) : '');
-    final savedController = TextEditingController(text: existing != null ? _euros(existing.savedCents) : '0');
-    final monthlyController = TextEditingController(text: existing != null ? _euros(existing.monthlyAllocationCents) : '');
-    var deadline = existing?.deadline ?? DateTime.now().add(const Duration(days: 365));
-    final goal = await showModalBottomSheet<SavingsGoal>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.viewInsetsOf(context).bottom + 24),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(existing != null ? 'Sparziel bearbeiten' : 'Sparziel anlegen', style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 18),
-            TextField(controller: nameController, autofocus: true, decoration: const InputDecoration(labelText: 'Name', hintText: 'z. B. Neuer Laptop', border: OutlineInputBorder())),
-            const SizedBox(height: 12),
-            Row(children: [Expanded(child: TextField(controller: targetController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Zielbetrag', border: OutlineInputBorder()))), const SizedBox(width: 12), Expanded(child: TextField(controller: monthlyController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(prefixText: '€ ', labelText: 'Pro Monat', border: OutlineInputBorder())))]),
-            const SizedBox(height: 12),
-            Row(children: [const Icon(Icons.event_outlined, size: 20), const SizedBox(width: 8), Expanded(child: Text('Zieltermin: ${_shortDate(deadline)}')), TextButton(onPressed: () async { final picked = await showDatePicker(context: context, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 3650)), initialDate: deadline); if (picked != null) setSheetState(() => deadline = picked); }, child: const Text('Ändern'))]),
-            const SizedBox(height: 8),
-            SizedBox(width: double.infinity, child: FilledButton(onPressed: () { final target = _parseAmount(targetController.text); final monthly = _parseAmount(monthlyController.text); if (nameController.text.trim().isEmpty || target <= 0 || monthly <= 0) return; Navigator.pop(sheetContext, SavingsGoal(id: existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(), name: nameController.text.trim(), targetCents: target, savedCents: _parseAmount(savedController.text), deadline: deadline, monthlyAllocationCents: monthly)); }, child: Text(existing != null ? 'Speichern' : 'Ziel speichern'))),
-          ]),
-        ),
+    final goal = await Navigator.push<SavingsGoal>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SavingsGoalScreen(existing: existing),
       ),
     );
     if (goal == null) return;
@@ -1733,9 +1571,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _scenarioName(ForecastScenario scenario) => switch (scenario) { ForecastScenario.cautious => 'Vorsichtig', ForecastScenario.realistic => 'Realistisch', ForecastScenario.optimistic => 'Optimistisch' };
   String _scenarioShort(ForecastScenario scenario) => switch (scenario) { ForecastScenario.cautious => 'Vorsicht', ForecastScenario.realistic => 'Realistisch', ForecastScenario.optimistic => 'Chance' };
   String _frequencyLabel(TransactionFrequency freq) => switch (freq) { TransactionFrequency.monthly => 'monatlich', TransactionFrequency.weekly => 'wöchentlich', TransactionFrequency.yearly => 'jährlich', TransactionFrequency.once => 'einmalig' };
-  String _money(int cents) => '${cents < 0 ? '-' : ''}${(cents.abs() / 100).toStringAsFixed(0)} €';
-  int _parseAmount(String value) => ((double.tryParse(value.replaceAll(',', '.')) ?? 0) * 100).round();
-  String _shortDate(DateTime date) => '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   String _monthLabel(DateTime date) => '${const ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'][date.month - 1]} ${date.year}';
 }
 
@@ -1754,8 +1589,16 @@ class _Sidebar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 30, 16, 24),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(padding: const EdgeInsets.only(left: 12, bottom: 36), child: Row(children: [
-          const Icon(Icons.auto_awesome_rounded, color: AppColors.primary),
-          const SizedBox(width: 8),
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Color(0xFF5669E8), Color(0xFF8290F8)]),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
+          ),
+          const SizedBox(width: 10),
           Text('Budget', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: isDark ? AppColors.darkText : AppColors.lightText)),
         ])),
         _item(context, 0, Icons.grid_view_rounded, 'Übersicht'),
@@ -1765,9 +1608,27 @@ class _Sidebar extends StatelessWidget {
         _item(context, 4, Icons.shopping_bag_outlined, 'Anschaffungen'),
         const Spacer(),
         _themeToggle(context),
-        const SizedBox(height: 12),
-        Padding(padding: const EdgeInsets.all(12), child: Text('LOKAL & PRIVAT', style: TextStyle(fontSize: 10, letterSpacing: 1, color: AppColors.darkMuted, fontWeight: FontWeight.w700))),
-        Padding(padding: const EdgeInsets.all(12), child: Text('Deine Daten bleiben auf deinem Gerät.', style: TextStyle(fontSize: 12, color: AppColors.darkMuted, height: 1.35))),
+        const SizedBox(height: 16),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.green.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.shield_rounded, size: 16, color: AppColors.green),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '100% lokal. Keine Cloud.',
+                  style: TextStyle(fontSize: 11, color: AppColors.green, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
       ]),
     );
   }
@@ -1791,5 +1652,53 @@ class _Sidebar extends StatelessWidget {
     );
   }
 
-  Widget _item(BuildContext context, int index, IconData icon, String label) => Padding(padding: const EdgeInsets.only(bottom: 6), child: Material(color: Colors.transparent, child: ListTile(selected: selectedIndex == index, onTap: () => onSelect(index), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), selectedTileColor: Theme.of(context).brightness == Brightness.dark ? AppColors.darkChipBg : const Color(0xFFEFF1FF), leading: Icon(icon, size: 20), title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis))));
+  Widget _item(BuildContext context, int index, IconData icon, String label) {
+    final isSelected = selectedIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => onSelect(index),
+          borderRadius: BorderRadius.circular(14),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? (isDark ? AppColors.darkChipBg : const Color(0xFFEFF1FF))
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected ? AppColors.primary.withValues(alpha: 0.3) : Colors.transparent,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: isSelected ? AppColors.primary : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected
+                        ? (isDark ? AppColors.darkText : AppColors.lightText)
+                        : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

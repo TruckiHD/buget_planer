@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../models/finance_models.dart';
+import '../../services/currency_service.dart';
 import '../../services/food_price_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/currency_utils.dart';
 import 'trip_location_picker.dart';
 
 Future<TripSegment?> showSegmentEditor(BuildContext context, TripPlan trip, {TripSegment? existing}) async {
@@ -68,11 +70,11 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
     _nameController = TextEditingController(text: _existing?.name ?? '');
     _locationController = TextEditingController(text: _existing?.location ?? '');
     _hotelController = TextEditingController(text: _existing?.accommodationName ?? '');
-    _hotelCostController = TextEditingController(text: _existing == null ? '' : _euros(_existing!.accommodationCostCents));
-    _foodController = TextEditingController(text: _existing == null ? (widget.trip.dailyBudgetCents > 0 ? _euros(widget.trip.dailyBudgetCents) : '') : _euros(_existing!.dailyFoodBudgetCents));
-    _transportController = TextEditingController(text: _existing == null ? '0' : _euros(_existing!.transportCostCents));
-    _otherController = TextEditingController(text: _existing == null ? '0' : _euros(_existing!.otherCostCents));
-    _baseTransportController = TextEditingController(text: _existing == null ? '' : _euros(_existing!.baseTransportCostCents));
+    _hotelCostController = TextEditingController(text: _existing == null ? '' : CurrencyUtils.formatCentsInput(_existing!.accommodationCostCents));
+    _foodController = TextEditingController(text: _existing == null ? (widget.trip.dailyBudgetCents > 0 ? CurrencyUtils.formatCentsInput(widget.trip.dailyBudgetCents) : '') : CurrencyUtils.formatCentsInput(_existing!.dailyFoodBudgetCents));
+    _transportController = TextEditingController(text: _existing == null ? '0' : CurrencyUtils.formatCentsInput(_existing!.transportCostCents));
+    _otherController = TextEditingController(text: _existing == null ? '0' : CurrencyUtils.formatCentsInput(_existing!.otherCostCents));
+    _baseTransportController = TextEditingController(text: _existing == null ? '' : CurrencyUtils.formatCentsInput(_existing!.baseTransportCostCents));
     _startsOn = _existing?.startsOn ?? _earliestStart;
     _endsOn = _existing?.endsOn ?? _earliestStart.add(const Duration(days: 2));
     _paid = _existing?.accommodationPaid ?? false;
@@ -181,6 +183,15 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
   Widget _foodSuggestionChip(FoodPriceData data) {
     final color = data.isCountryLevel ? const Color(0xFFE5A000) : AppColors.green;
     final label = data.isCountryLevel ? '${data.country} (Durchschnitt)' : data.city;
+
+    String priceText;
+    if (data.hasLocalPrices) {
+      final info = CurrencyService.getInfo(data.localCurrency!);
+      priceText = '$label: ~${info.symbol}${data.localMealInexpensive!.toStringAsFixed(0)} sparsam, ~${info.symbol}${data.localMealMidRange!.toStringAsFixed(0)} mittel';
+    } else {
+      priceText = '$label: ~${data.mealInexpensive.toStringAsFixed(0)}€ sparsam, ~${data.mealMidRange.toStringAsFixed(0)}€ mittel';
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -191,7 +202,7 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
         Icon(data.isCountryLevel ? Icons.public_rounded : Icons.lightbulb_outline_rounded, size: 16, color: color),
         const SizedBox(width: 8),
         Expanded(child: Text(
-          '$label: ~${data.mealInexpensive.toStringAsFixed(0)}€ sparsam, ~${data.mealMidRange.toStringAsFixed(0)}€ mittel',
+          priceText,
           style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600),
         )),
         TextButton(
@@ -283,7 +294,7 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
   }
 
   void _save() {
-    final food = _parseAmount(_foodController.text);
+    final food = CurrencyUtils.parseCents(_foodController.text);
     if (_locationController.text.trim().isEmpty || _hotelController.text.trim().isEmpty || food <= 0) return;
     final segment = TripSegment(
       id: _existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
@@ -292,21 +303,18 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
       startsOn: _startsOn,
       endsOn: _endsOn,
       accommodationName: _hotelController.text.trim(),
-      accommodationCostCents: _parseAmount(_hotelCostController.text),
+      accommodationCostCents: CurrencyUtils.parseCents(_hotelCostController.text),
       dailyFoodBudgetCents: food,
-      transportCostCents: _parseAmount(_transportController.text),
-      otherCostCents: _parseAmount(_otherController.text),
+      transportCostCents: CurrencyUtils.parseCents(_transportController.text),
+      otherCostCents: CurrencyUtils.parseCents(_otherController.text),
       accommodationPaid: _paid,
       latitude: _lat != null && _lat! > 0 ? _lat : null,
       longitude: _lng != null && _lng! > 0 ? _lng : null,
       isBaseLocation: _isBaseLocation,
-      baseTransportCostCents: _isBaseLocation ? _parseAmount(_baseTransportController.text) : 0,
+      baseTransportCostCents: _isBaseLocation ? CurrencyUtils.parseCents(_baseTransportController.text) : 0,
     );
     Navigator.pop(context, segment);
   }
-
-  String _euros(int cents) => (cents / 100).toStringAsFixed(2);
-  int _parseAmount(String value) => ((double.tryParse(value.replaceAll(',', '.')) ?? 0) * 100).round();
 
   Widget _sectionHeader(IconData icon, String label) {
     return Row(children: [
@@ -321,6 +329,19 @@ class _SegmentEditorSheetState extends State<_SegmentEditorSheet> {
       final budget = data.budgetCents / 100;
       final suggested = data.suggestedBudgetCents / 100;
       final comfortable = data.comfortableCents / 100;
+
+      if (data.hasLocalPrices) {
+        final info = CurrencyService.getInfo(data.localCurrency!);
+        final localBudget = data.localMealInexpensive! * 2;
+        final localSuggested = (data.localMealInexpensive! + data.localMealMidRange!) / 2;
+        final localComfortable = data.localMealMidRange!;
+        return [
+          ActionChip(label: Text('${info.symbol}${localBudget.toStringAsFixed(0)} sparsam'), onPressed: () => setState(() => _foodController.text = budget.toStringAsFixed(2))),
+          ActionChip(label: Text('${info.symbol}${localSuggested.toStringAsFixed(0)} normal'), onPressed: () => setState(() => _foodController.text = suggested.toStringAsFixed(2))),
+          ActionChip(label: Text('${info.symbol}${localComfortable.toStringAsFixed(0)} komfortabel'), onPressed: () => setState(() => _foodController.text = comfortable.toStringAsFixed(2))),
+        ];
+      }
+
       return [
         ActionChip(label: Text('${budget.toStringAsFixed(0)}€ sparsam'), onPressed: () => setState(() => _foodController.text = budget.toStringAsFixed(2))),
         ActionChip(label: Text('${suggested.toStringAsFixed(0)}€ normal'), onPressed: () => setState(() => _foodController.text = suggested.toStringAsFixed(2))),

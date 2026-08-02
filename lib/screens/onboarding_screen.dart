@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/finance_models.dart';
 import '../utils/app_theme.dart';
+import '../utils/currency_utils.dart';
 import '../utils/squircle_container.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -244,17 +245,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  int _parseAmount(String value) => ((double.tryParse(value.replaceAll(',', '.')) ?? 0) * 100).round();
-
   void _skip() {
     widget.onComplete(widget.profile);
   }
 
   Future<void> _complete() async {
-    final balance = _parseAmount(_balanceController.text);
-    final income = _parseAmount(_incomeController.text);
-    final rent = _parseAmount(_rentController.text);
-    final subs = _parseAmount(_subscriptionsController.text);
+    final balance = CurrencyUtils.parseCents(_balanceController.text);
+    final income = CurrencyUtils.parseCents(_incomeController.text);
+    final rent = CurrencyUtils.parseCents(_rentController.text);
+    final subs = CurrencyUtils.parseCents(_subscriptionsController.text);
 
     final recurring = <RecurringTransaction>[];
     if (income > 0) {

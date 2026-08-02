@@ -11,6 +11,9 @@ class BookingLinks {
   final String? hertzUrl;
   final String? europcarUrl;
   final String? skannerUrl;
+  final String? jrCentralUrl;
+  final String? jrPassUrl;
+  final String? hyperdiaUrl;
 
   const BookingLinks({
     required this.googleMapsUrl,
@@ -21,10 +24,24 @@ class BookingLinks {
     this.hertzUrl,
     this.europcarUrl,
     this.skannerUrl,
+    this.jrCentralUrl,
+    this.jrPassUrl,
+    this.hyperdiaUrl,
   });
 }
 
 class BookingService {
+  static bool _isJapanTrip(String location) {
+    final lower = location.toLowerCase();
+    return lower.contains('japan') || lower.contains('tokyo') ||
+        lower.contains('kyoto') || lower.contains('osaka') ||
+        lower.contains('hiroshima') || lower.contains('nagoya') ||
+        lower.contains('sapporo') || lower.contains('fukuoka') ||
+        lower.contains('nara') || lower.contains('yokohama') ||
+        lower.contains('kobe') || lower.contains('nikko') ||
+        lower.contains('hakone') || lower.contains('kanazawa');
+  }
+
   static BookingLinks getLinks({
     required TripTransport transport,
   }) {
@@ -33,18 +50,19 @@ class BookingService {
     final to = transport.toLocation;
     final dateStr = DateFormat('dd.MM.yyyy').format(date);
     final isoDate = DateFormat('yyyy-MM-dd').format(date);
+    final isJapan = _isJapanTrip(from) || _isJapanTrip(to);
 
     return BookingLinks(
       googleMapsUrl: 'https://www.google.com/maps/dir/?api=1'
           '&origin=${Uri.encodeComponent(from)}'
           '&destination=${Uri.encodeComponent(to)}'
           '&travelmode=transit',
-      dbUrl: 'https://www.bahn.de/buchung/fahrplan/suche'
+      dbUrl: isJapan ? null : 'https://www.bahn.de/buchung/fahrplan/suche'
           '?stb=true'
           '&so=${Uri.encodeComponent(from)}'
           '&zo=${Uri.encodeComponent(to)}'
           '&date=$dateStr',
-      flixBusUrl: 'https://shop.flixbus.com/search'
+      flixBusUrl: isJapan ? null : 'https://shop.flixbus.com/search'
           '?departureCity=${Uri.encodeComponent(from)}'
           '&arrivalCity=${Uri.encodeComponent(to)}'
           '&rideDate=$isoDate',
@@ -67,6 +85,9 @@ class BookingService {
           '?from=${Uri.encodeComponent(from)}'
           '&to=${Uri.encodeComponent(to)}'
           '&depart=$isoDate',
+      jrCentralUrl: isJapan ? 'https://www.jr-central.co.jp/en/' : null,
+      jrPassUrl: isJapan ? 'https://www.japanrailpass.net/' : null,
+      hyperdiaUrl: isJapan ? 'https://www.hyperdia.com/' : null,
     );
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/finance_models.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/currency_utils.dart';
 
 class TripCostBreakdown extends StatelessWidget {
   final TripPlan trip;
@@ -66,7 +67,7 @@ class TripCostBreakdown extends StatelessWidget {
         const SizedBox(width: 5),
         Text(item.label, style: TextStyle(fontSize: 12, color: mutedColor)),
         const SizedBox(width: 4),
-        Text(_money(item.cents), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: item.color)),
+        Text(CurrencyUtils.formatCents(item.cents), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: item.color)),
         const SizedBox(width: 2),
         Text('($percent%)', style: TextStyle(fontSize: 11, color: mutedColor)),
       ],
@@ -112,7 +113,6 @@ class TripCostBreakdown extends StatelessWidget {
     return items;
   }
 
-  String _money(int cents) => '${(cents / 100).toStringAsFixed(0)} €';
 }
 
 class _CostItem {

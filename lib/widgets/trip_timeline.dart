@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../models/finance_models.dart';
 import '../utils/app_theme.dart';
+import '../utils/currency_utils.dart';
+import '../utils/theme_extensions.dart';
 
 class TripTimeline extends StatelessWidget {
   final TripPlan trip;
@@ -139,10 +141,10 @@ class TripTimeline extends StatelessWidget {
       ),
       const SizedBox(height: 6),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(_shortDate(trip.startsOn), style: TextStyle(fontSize: 10, color: isDark ? AppColors.darkMuted : AppColors.lightMuted)),
+        Text(trip.startsOn.shortDateNoYear, style: TextStyle(fontSize: 10, color: isDark ? AppColors.darkMuted : AppColors.lightMuted)),
         if (trip.days > 4)
-          Text(_shortDate(trip.startsOn.add(Duration(days: trip.days ~/ 2))), style: TextStyle(fontSize: 10, color: isDark ? AppColors.darkMuted : AppColors.lightMuted)),
-        Text(_shortDate(trip.endsOn), style: TextStyle(fontSize: 10, color: isDark ? AppColors.darkMuted : AppColors.lightMuted)),
+          Text(trip.startsOn.add(Duration(days: trip.days ~/ 2)).shortDateNoYear, style: TextStyle(fontSize: 10, color: isDark ? AppColors.darkMuted : AppColors.lightMuted)),
+        Text(trip.endsOn.shortDateNoYear, style: TextStyle(fontSize: 10, color: isDark ? AppColors.darkMuted : AppColors.lightMuted)),
       ]),
     ]);
   }
@@ -165,7 +167,7 @@ class TripTimeline extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${gap.days} ${gap.days == 1 ? 'Nacht' : 'Nächte'} nicht gebucht', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              Text('${_shortDate(gap.start)} → ${_shortDate(gap.end)}', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkMuted : AppColors.lightMuted)),
+              Text('${gap.start.shortDate} → ${gap.end.shortDate}', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkMuted : AppColors.lightMuted)),
             ])),
           ]),
         ),
@@ -260,7 +262,7 @@ class TripTimeline extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(child: Text(
-              '${_shortDate(week.start)} – ${_shortDate(week.end)} · $days Tage',
+              '${week.start.shortDate} – ${week.end.shortDate} · $days Tage',
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             )),
           ]),
@@ -282,7 +284,7 @@ class TripTimeline extends StatelessWidget {
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('${seg.location} · ${seg.accommodationName}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                   Text(
-                    '${seg.days} Nächte · ${_money(seg.accommodationCostCents)} · Essen ${_money(seg.dailyFoodBudgetCents)}/Tag',
+                    '${seg.days} Nächte · ${CurrencyUtils.formatCents(seg.accommodationCostCents)} · Essen ${CurrencyUtils.formatCents(seg.dailyFoodBudgetCents)}/Tag',
                     style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkMuted : AppColors.lightMuted),
                   ),
                 ])),
@@ -324,8 +326,7 @@ class TripTimeline extends StatelessWidget {
     );
   }
 
-  String _shortDate(DateTime date) => '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.';
-  String _money(int cents) => '${(cents / 100).toStringAsFixed(0)} €';
+
 }
 
 class _WeekData {

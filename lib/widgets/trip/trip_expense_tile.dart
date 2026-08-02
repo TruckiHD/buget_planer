@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../models/finance_models.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/currency_utils.dart';
+import '../../utils/theme_extensions.dart';
 
 class TripExpenseTile extends StatelessWidget {
   final TripExpense expense;
@@ -20,7 +22,6 @@ class TripExpenseTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
     return Dismissible(
       key: ValueKey(expense.id),
@@ -52,7 +53,7 @@ class TripExpenseTile extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(expense.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            Text('${expense.category} · ${_dateLabel(expense.date)}', style: TextStyle(fontSize: 11, color: mutedColor)),
+            Text('${expense.category} · ${expense.date.shortDate}', style: TextStyle(fontSize: 11, color: context.mutedColor)),
           ])),
           GestureDetector(
             onTap: onTogglePaid,
@@ -69,7 +70,7 @@ class TripExpenseTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(_money(expense.amountCents), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          Text(CurrencyUtils.formatCents(expense.amountCents), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
           IconButton(
             tooltip: 'Bearbeiten',
             onPressed: onEdit,
@@ -113,6 +114,4 @@ class TripExpenseTile extends StatelessWidget {
     }
   }
 
-  String _money(int cents) => '${(cents / 100).toStringAsFixed(0)} €';
-  String _dateLabel(DateTime date) => '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
 }

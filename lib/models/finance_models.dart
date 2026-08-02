@@ -440,6 +440,11 @@ class FoodPriceData {
   final double groceriesPerDay;
   final double coffeePrice;
   final bool isCountryLevel;
+  final String? localCurrency;
+  final double? localMealInexpensive;
+  final double? localMealMidRange;
+  final double? localGroceriesPerDay;
+  final double? localCoffeePrice;
 
   const FoodPriceData({
     required this.city,
@@ -449,11 +454,18 @@ class FoodPriceData {
     required this.groceriesPerDay,
     this.coffeePrice = 3.0,
     this.isCountryLevel = false,
+    this.localCurrency,
+    this.localMealInexpensive,
+    this.localMealMidRange,
+    this.localGroceriesPerDay,
+    this.localCoffeePrice,
   });
 
   int get suggestedBudgetCents => ((mealInexpensive + mealMidRange) / 2 * 100).round();
   int get budgetCents => (mealInexpensive * 100 * 2).round();
   int get comfortableCents => (mealMidRange * 100).round();
+
+  bool get hasLocalPrices => localCurrency != null && localMealInexpensive != null;
 }
 
 class TripExpense {
@@ -544,6 +556,7 @@ class TripPlan {
   final int rentalCarFuelCents;
   final int rentalCarTollCents;
   final int rentalCarParkingCents;
+  final String? targetCurrency;
 
   const TripPlan({
     required this.id,
@@ -576,6 +589,7 @@ class TripPlan {
     this.rentalCarFuelCents = 0,
     this.rentalCarTollCents = 0,
     this.rentalCarParkingCents = 0,
+    this.targetCurrency,
   });
 
   int get days => endsOn.difference(startsOn).inDays.clamp(1, 365).toInt();
@@ -693,6 +707,7 @@ class TripPlan {
         'rentalCarFuelCents': rentalCarFuelCents,
         'rentalCarTollCents': rentalCarTollCents,
         'rentalCarParkingCents': rentalCarParkingCents,
+        if (targetCurrency != null) 'targetCurrency': targetCurrency,
       };
 
   factory TripPlan.fromJson(Map<String, dynamic> json) => TripPlan(
@@ -732,6 +747,7 @@ class TripPlan {
         rentalCarFuelCents: json['rentalCarFuelCents'] as int? ?? 0,
         rentalCarTollCents: json['rentalCarTollCents'] as int? ?? 0,
         rentalCarParkingCents: json['rentalCarParkingCents'] as int? ?? 0,
+        targetCurrency: json['targetCurrency'] as String?,
       );
 
   TripPlan copyWith({
@@ -764,6 +780,7 @@ class TripPlan {
     int? rentalCarFuelCents,
     int? rentalCarTollCents,
     int? rentalCarParkingCents,
+    String? targetCurrency,
   }) {
     return TripPlan(
       id: id,
@@ -796,6 +813,7 @@ class TripPlan {
       rentalCarFuelCents: rentalCarFuelCents ?? this.rentalCarFuelCents,
       rentalCarTollCents: rentalCarTollCents ?? this.rentalCarTollCents,
       rentalCarParkingCents: rentalCarParkingCents ?? this.rentalCarParkingCents,
+      targetCurrency: targetCurrency ?? this.targetCurrency,
     );
   }
 }
