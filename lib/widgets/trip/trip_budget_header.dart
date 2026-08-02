@@ -51,14 +51,14 @@ class TripBudgetHeader extends StatelessWidget {
           _statusPill(overLimit ? 'Über Budget' : 'Im Budget', !overLimit),
         ]),
         const SizedBox(height: 18),
-        Row(children: [
-          _metric('Geplant', CurrencyUtils.formatCents(trip.totalCostCents), overLimit ? AppColors.red : AppColors.green, mutedColor),
-          const SizedBox(width: 20),
-          if (trip.budgetLimitCents > 0) _metric('Limit', CurrencyUtils.formatCents(trip.budgetLimitCents), AppColors.primary, mutedColor),
-          if (trip.budgetLimitCents > 0) const SizedBox(width: 20),
-          _metric('Offen', CurrencyUtils.formatCents(trip.remainingCostCents), overLimit ? AppColors.red : AppColors.green, mutedColor),
-          const SizedBox(width: 20),
-          _metric('Bezahlt', CurrencyUtils.formatCents(trip.paidCents), AppColors.green, mutedColor),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Expanded(child: _metric('Geplant', CurrencyUtils.formatCents(trip.totalCostCents), overLimit ? AppColors.red : AppColors.green, mutedColor)),
+          if (trip.budgetLimitCents > 0) const SizedBox(width: 8),
+          if (trip.budgetLimitCents > 0) Expanded(child: _metric('Limit', CurrencyUtils.formatCents(trip.budgetLimitCents), AppColors.primary, mutedColor)),
+          const SizedBox(width: 8),
+          Expanded(child: _metric('Offen', CurrencyUtils.formatCents(trip.remainingCostCents), overLimit ? AppColors.red : AppColors.green, mutedColor)),
+          const SizedBox(width: 8),
+          Expanded(child: _metric('Bezahlt', CurrencyUtils.formatCents(trip.paidCents), AppColors.green, mutedColor)),
         ]),
         if (trip.budgetLimitCents > 0) ...[
           const SizedBox(height: 14),

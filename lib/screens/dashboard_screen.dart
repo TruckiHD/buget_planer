@@ -22,6 +22,7 @@ import '../widgets/charts/category_donut_chart.dart';
 import '../widgets/charts/year_review_chart.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/shared/animated_counter.dart';
+import '../widgets/shared/modern_nav_bar.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -97,15 +98,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           bottomNavigationBar: desktop
               ? null
-              : NavigationBar(
+              : ModernNavBar(
                   selectedIndex: _selectedIndex,
                   onDestinationSelected: _selectTab,
-                  destinations: const [
-                    NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: 'Übersicht'),
-                    NavigationDestination(icon: Icon(Icons.flight_takeoff_rounded), label: 'Reisen'),
-                    NavigationDestination(icon: Icon(Icons.swap_vert_rounded), label: 'Cashflow'),
-                    NavigationDestination(icon: Icon(Icons.flag_outlined), label: 'Ziele'),
-                    NavigationDestination(icon: Icon(Icons.shopping_bag_outlined), label: 'Anschaffungen'),
+                  items: const [
+                    NavItem(icon: Icons.grid_view_rounded, label: 'Übersicht'),
+                    NavItem(icon: Icons.flight_takeoff_rounded, label: 'Reisen'),
+                    NavItem(icon: Icons.swap_vert_rounded, label: 'Cashflow'),
+                    NavItem(icon: Icons.flag_outlined, label: 'Ziele'),
+                    NavItem(icon: Icons.shopping_bag_outlined, label: 'Anschaffungen'),
                   ],
                 ),
         );
@@ -756,15 +757,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Row(children: [
                     Icon(Icons.location_on_outlined, size: 14, color: _mutedColor),
                     const SizedBox(width: 4),
-                    Text(trip.destination.isEmpty ? 'Kein Ziel' : trip.destination, style: TextStyle(fontSize: 13, color: _mutedColor)),
+                    Flexible(child: Text(trip.destination.isEmpty ? 'Kein Ziel' : trip.destination, style: TextStyle(fontSize: 13, color: _mutedColor), overflow: TextOverflow.ellipsis)),
                     const SizedBox(width: 12),
                     Icon(Icons.calendar_today_rounded, size: 14, color: _mutedColor),
                     const SizedBox(width: 4),
-                    Text('${trip.startsOn.shortDate} – ${trip.endsOn.shortDate}', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                    Flexible(child: Text('${trip.startsOn.shortDate} – ${trip.endsOn.shortDate}', style: TextStyle(fontSize: 13, color: _mutedColor), overflow: TextOverflow.ellipsis)),
                     const SizedBox(width: 12),
                     Icon(Icons.schedule_rounded, size: 14, color: _mutedColor),
                     const SizedBox(width: 4),
-                    Text('${trip.days} Tage', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                    Flexible(child: Text('${trip.days} Tage', style: TextStyle(fontSize: 13, color: _mutedColor), overflow: TextOverflow.ellipsis)),
                   ]),
                   const SizedBox(height: 16),
                   Row(children: [
@@ -791,12 +792,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(children: [
                       Icon(trip.isOverBudget ? Icons.warning_amber_rounded : Icons.check_circle_outline_rounded, size: 16, color: trip.isOverBudget ? AppColors.red : AppColors.green),
                       const SizedBox(width: 6),
-                      Text(
+                      Flexible(child: Text(
                         trip.isOverBudget
                             ? '${CurrencyUtils.formatCents(-trip.budgetRemainingCents)} über Limit'
                             : '${CurrencyUtils.formatCents(trip.budgetRemainingCents)} im Limit',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: trip.isOverBudget ? AppColors.red : AppColors.green),
-                      ),
+                        overflow: TextOverflow.ellipsis,
+                      )),
                     ]),
                   ],
                 ],
@@ -1145,11 +1147,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Text(goal.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textColor)),
                     const SizedBox(height: 4),
                     Row(children: [
-                      Text('Ziel: ${CurrencyUtils.formatCents(goal.targetCents)}', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                      Flexible(child: Text('Ziel: ${CurrencyUtils.formatCents(goal.targetCents)}', style: TextStyle(fontSize: 13, color: _mutedColor), overflow: TextOverflow.ellipsis)),
                       const SizedBox(width: 16),
-                      Text('${CurrencyUtils.formatCents(goal.savedCents)} gespart', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.green)),
+                      Flexible(child: Text('${CurrencyUtils.formatCents(goal.savedCents)} gespart', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.green), overflow: TextOverflow.ellipsis)),
                       const SizedBox(width: 16),
-                      Text('${CurrencyUtils.formatCents(goal.monthlyAllocationCents)}/Monat', style: TextStyle(fontSize: 13, color: _mutedColor)),
+                      Flexible(child: Text('${CurrencyUtils.formatCents(goal.monthlyAllocationCents)}/Monat', style: TextStyle(fontSize: 13, color: _mutedColor), overflow: TextOverflow.ellipsis)),
                     ]),
                     const SizedBox(height: 16),
                     ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: goal.progress, minHeight: 10, color: statusColor, backgroundColor: _dividerColor)),

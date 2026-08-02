@@ -55,7 +55,7 @@ class TripSegmentTile extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Text(segment.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                Flexible(child: Text(segment.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14), overflow: TextOverflow.ellipsis)),
                 if (segment.isBaseLocation) ...[
                   const SizedBox(width: 6),
                   Container(
@@ -69,11 +69,11 @@ class TripSegmentTile extends StatelessWidget {
               Row(children: [
                 Icon(Icons.location_on_outlined, size: 13, color: mutedColor),
                 const SizedBox(width: 3),
-                Text(segment.location, style: TextStyle(fontSize: 12, color: mutedColor)),
+                Flexible(child: Text(segment.location, style: TextStyle(fontSize: 12, color: mutedColor), overflow: TextOverflow.ellipsis)),
                 const SizedBox(width: 8),
                 Icon(Icons.calendar_today_outlined, size: 12, color: mutedColor),
                 const SizedBox(width: 3),
-                Text('${segment.days} Tage', style: TextStyle(fontSize: 12, color: mutedColor)),
+                Flexible(child: Text('${segment.days} Tage', style: TextStyle(fontSize: 12, color: mutedColor), overflow: TextOverflow.ellipsis)),
               ]),
             ])),
             GestureDetector(
@@ -98,14 +98,16 @@ class TripSegmentTile extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 10),
-          Row(children: [
+          Wrap(spacing: 4, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.end, children: [
             _miniStat('Hotel', segment.accommodationCostCents, AppColors.primary),
             _miniStat('Essen', segment.foodCostCents, AppColors.green),
             if (segment.transportCostCents > 0) _miniStat('Transport', segment.transportCostCents, AppColors.amber),
             if (segment.baseTransportCostCents > 0) _miniStat('Ausflüge', segment.baseTransportCostCents, const Color(0xFF00B8D9)),
             if (segment.otherCostCents > 0) _miniStat('Sonstiges', segment.otherCostCents, const Color(0xFF00B8D9)),
-            const Spacer(),
-            Text(CurrencyUtils.formatCents(totalSegmentCost), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text(CurrencyUtils.formatCents(totalSegmentCost), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+            ),
           ]),
           if (totalSegmentCost > 0) ...[
             const SizedBox(height: 8),

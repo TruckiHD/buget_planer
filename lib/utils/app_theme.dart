@@ -84,10 +84,6 @@ class AppTheme {
         enabledBorder: SquircleInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide(color: AppColors.darkBorder)),
         focusedBorder: SquircleInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
       ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.darkSurface,
-        indicatorColor: AppColors.darkChipBg,
-      ),
     );
   }
 }
